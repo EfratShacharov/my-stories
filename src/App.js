@@ -17,7 +17,7 @@ const cacheRtl = createCache({
 
 // יצירת Theme עם RTL
 const theme = createTheme({
-  direction: 'rtl', // משנה את כיוון כל רכיבי MUI ל־Right-to-Left
+  direction: 'rtl',
 });
 
 function App() {

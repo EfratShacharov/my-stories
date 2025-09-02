@@ -17,9 +17,9 @@ const Home = () => {
                         <Button
                             variant="contained"
                             style={{ marginTop: 10 }}
-                            href={story.pdf}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            //הקובץ מומר על המסך
+                            component={Link}
+                            to={`/story/${story.id}`}
                         >
                             קרא עוד
                         </Button>
