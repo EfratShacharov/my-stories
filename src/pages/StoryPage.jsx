@@ -1,13 +1,12 @@
-import { Button, Container, Typography, CircularProgress } from '@mui/material';
-import React, { useState } from 'react';
+import { Button, Container, Typography, CircularProgress, Box } from '@mui/material';
+import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import stories from '../data/Stories';
 import { Document, Page, pdfjs } from 'react-pdf';
-//טוענות את קבצי ה-CSS של react-pdf כך שהטקסט וההערות ב-PDF יוצגו נכון.
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-//השורה הזו קובעת ל - pdf.js מאיפה לטעון את קובץ ה-worker שמטפל בפיענוח pdf ברקע.
+// מגדירים ל-pdf.js מאיפה לטעון את ה-worker
 pdfjs.GlobalWorkerOptions.workerSrc =
   `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
@@ -17,34 +16,56 @@ const StoryPage = () => {
   const [numPages, setNumPages] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pageWidth, setPageWidth] = useState(window.innerWidth * 0.9);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      let newWidth = width * 0.9;
+      if (width > 1200) newWidth = 1000;
+      else if (width > 900) newWidth = 800;
+      else if (width > 600) newWidth = 600;
+      else newWidth = width * 0.95;
+      setPageWidth(newWidth);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   if (!story) {
     return (
-      <Container style={{ padding: 20, textAlign: 'right' }}>
-        <Typography variant="h5">סיפור לא נמצא</Typography>
-        <Button component={Link} to="/" variant="contained" style={{ marginTop: 10 }}>
+      <Container sx={{ p: { xs: 1, sm: 2, md: 3 }, textAlign: 'center', maxWidth: 'md' }}>
+        <Typography variant="h5" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem', md: '2rem' } }}>
+          סיפור לא נמצא
+        </Typography>
+        <Button
+          component={Link}
+          to="/"
+          variant="contained"
+          sx={{ mt: 2, width: { xs: '100%', sm: 'auto' } }}
+        >
           חזור לדף הבית
         </Button>
       </Container>
     );
   }
+
   return (
-    <Container style={{ padding: 20, textAlign: 'center' }}>
+    <Container sx={{ p: { xs: 1, sm: 2, md: 3 }, textAlign: 'center', maxWidth: 'lg' }}>
       <Document
         file={story.pdf}
         loading={
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              minHeight: '60vh', // גובה מינימלי כדי שיבלט באמצע
-        
-            }}
+          <Box
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
+            minHeight="60vh"
           >
-            <CircularProgress size={100} />
-          </div>
-        } onLoadSuccess={({ numPages }) => {
+            <CircularProgress size={80} />
+          </Box>
+        }
+        onLoadSuccess={({ numPages }) => {
           setNumPages(numPages);
           setError(null);
           setLoading(false);
@@ -52,42 +73,42 @@ const StoryPage = () => {
         onLoadError={(e) => setError(e.message)}
       >
         {error && (
-          <Typography color="error" style={{ marginBottom: 10 }}>
+          <Typography color="error" sx={{ mb: 2 }}>
             שגיאה בטעינת הקובץ: {error}
           </Typography>
         )}
-        {!loading &&
-          numPages &&
+
+        {!loading && numPages &&
           Array.from({ length: numPages }, (_, i) => (
-            <div
+            <Box
               key={i}
-              style={{
-                marginBottom: 20,
-                display: 'flex',
-                justifyContent: 'center'
-              }}
+              display="flex"
+              justifyContent="center"
+              mb={2}
             >
               <Page
                 pageNumber={i + 1}
                 renderAnnotationLayer={false}
-                renderTextLayer={true}
-                width={800}
+                renderTextLayer
+                width={pageWidth}
+                scale={0.9}
               />
-            </div>
+            </Box>
           ))}
       </Document>
+
       {!loading && (
         <Button
           component={Link}
           to="/"
           variant="contained"
-          style={{ marginTop: 20 }}
+          sx={{ mt: 3, width: { xs: '100%', sm: 'auto' } }}
         >
           חזור לדף הבית
         </Button>
       )}
-    </Container >
+    </Container>
   );
-}
+};
 
 export default StoryPage;
