@@ -1,4 +1,4 @@
-import { Button, Container, Typography } from '@mui/material';
+import { Button, Container, Typography, CircularProgress } from '@mui/material';
 import React, { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import stories from '../data/Stories';
@@ -16,6 +16,7 @@ const StoryPage = () => {
   const story = stories.find(s => s.id === parseInt(id, 10));
   const [numPages, setNumPages] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   if (!story) {
     return (
@@ -27,16 +28,27 @@ const StoryPage = () => {
       </Container>
     );
   }
-
   return (
-    <Container style={{ padding: 20, textAlign: 'right' }}>
-      <Typography variant="h4" style={{ marginBottom: 20 }}>
-        {story.title}
-      </Typography>
-
+    <Container style={{ padding: 20, textAlign: 'center' }}>
       <Document
         file={story.pdf}
-        onLoadSuccess={({ numPages }) => { setNumPages(numPages); setError(null); }}
+        loading={
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              minHeight: '60vh', // גובה מינימלי כדי שיבלט באמצע
+        
+            }}
+          >
+            <CircularProgress size={100} />
+          </div>
+        } onLoadSuccess={({ numPages }) => {
+          setNumPages(numPages);
+          setError(null);
+          setLoading(false);
+        }}
         onLoadError={(e) => setError(e.message)}
       >
         {error && (
@@ -44,24 +56,38 @@ const StoryPage = () => {
             שגיאה בטעינת הקובץ: {error}
           </Typography>
         )}
-
-        {numPages && Array.from({ length: numPages }, (_, i) => (
-          <div key={i} style={{ marginBottom: 20, display: 'flex', justifyContent: 'center' }}>
-            <Page
-              pageNumber={i + 1}
-              renderAnnotationLayer={false}
-              renderTextLayer={true}
-              width={800}
-            />
-          </div>
-        ))}
+        {!loading &&
+          numPages &&
+          Array.from({ length: numPages }, (_, i) => (
+            <div
+              key={i}
+              style={{
+                marginBottom: 20,
+                display: 'flex',
+                justifyContent: 'center'
+              }}
+            >
+              <Page
+                pageNumber={i + 1}
+                renderAnnotationLayer={false}
+                renderTextLayer={true}
+                width={800}
+              />
+            </div>
+          ))}
       </Document>
-
-      <Button component={Link} to="/" variant="contained" style={{ marginTop: 20 }}>
-        חזור לדף הבית
-      </Button>
-    </Container>
+      {!loading && (
+        <Button
+          component={Link}
+          to="/"
+          variant="contained"
+          style={{ marginTop: 20 }}
+        >
+          חזור לדף הבית
+        </Button>
+      )}
+    </Container >
   );
-};
+}
 
 export default StoryPage;
