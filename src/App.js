@@ -15,7 +15,7 @@ const cacheRtl = createCache({
   stylisPlugins: [prefixer, rtlPlugin],
 });
 
-// יצירת Theme עם RTL
+// יצירת theme עם RTL
 const theme = createTheme({
   direction: 'rtl',
 });

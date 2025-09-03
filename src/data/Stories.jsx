@@ -3,13 +3,25 @@ const stories = [
       id: 1,
       title: "לא מוותרים",
       summary: "תקציר קצר של סיפור ראשון...",
-      pdf: "/pdfs/Lo_Mevatrim.pdf"
+      doc: "/docs/Lo_Mevatrim.docx"
     },
     {
       id: 2,
       title: "הלוואי שנזכה",
       summary: "תקציר קצר של סיפור שני...",
-      pdf: "/pdfs/Halevai_Shenizkeh.pdf"
+      doc: "/docs/Halevai_Shenizkeh.docx"
+    },
+    {
+      id: 3,
+      title: "איפה הם ואיפה אנחנו",
+      summary: "תקציר קצר של סיפור שלישי...",
+      doc: "/docs/Eifo_Hem.docx"
+    },
+    {
+      id: 4,
+      title: "רק אם נרצה",
+      summary: "תקציר קצר של סיפור רביעי...",
+      doc: "/docs/Rak_Im_Nirtze.docx"
     },
   ];
   
