@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 
 const Navbar = () => {
   return (
-    <AppBar position="static">
+    <AppBar position="fixed" sx={{top:0}}>
       <Toolbar style={{ justifyContent: 'space-between' }}>
         <Typography variant="h6">
           הסיפורים שלי

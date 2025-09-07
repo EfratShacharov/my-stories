@@ -1,50 +1,76 @@
-import { Button, Container, Typography, CircularProgress, Box } from '@mui/material';
-import React, { useState, useEffect } from 'react';
+import { Button, Container, Typography, CircularProgress, Box, Toolbar } from '@mui/material';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import stories from '../data/Stories';
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
-
-// מגדירים ל-pdf.js מאיפה לטעון את ה-worker
-pdfjs.GlobalWorkerOptions.workerSrc =
-  `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+import mammoth from "mammoth";
 
 const StoryPage = () => {
   const { id } = useParams();
   const story = stories.find(s => s.id === parseInt(id, 10));
-  const [numPages, setNumPages] = useState(null);
+
+  const [content, setContent] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [pageWidth, setPageWidth] = useState(window.innerWidth * 0.9);
+  const [scrollHeight, setScrollHeight] = useState(0);
+
+  const contentRef = useRef(null);
+  const leftRef = useRef(null);
+  const rightRef = useRef(null);
+  const isSyncing = useRef(false);
 
   useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      let newWidth = width * 0.9;
-      if (width > 1200) newWidth = 1000;
-      else if (width > 900) newWidth = 800;
-      else if (width > 600) newWidth = 600;
-      else newWidth = width * 0.95;
-      setPageWidth(newWidth);
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = "auto";
     };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      setScrollHeight(contentRef.current.scrollHeight);
+    }
+  }, [content, loading]);
+
+  useEffect(() => {
+    if (story?.docx) {
+      fetch(story.docx)
+        .then(res => res.arrayBuffer())
+        .then(buffer => mammoth.extractRawText({ arrayBuffer: buffer }))
+        .then(result => {
+          const lines = result.value.split("\n");
+          let filtered = lines.filter(line => !line.includes(")") && !/[A-Za-z]/.test(line));
+          filtered = filtered.filter(line => line.trim() !== "");
+          setContent(filtered.join("\n"));
+          setError(null);
+          setLoading(false);
+        })
+        .catch(err => {
+          setError(err.message);
+          setLoading(false);
+        });
+    }
+  }, [story]);
+
+  const syncScroll = (sourceRef, targetRefs) => {
+    if (!sourceRef.current || isSyncing.current) return;
+    isSyncing.current = true;
+
+    const scrollTop = sourceRef.current.scrollTop;
+    targetRefs.forEach(ref => {
+      if (ref.current) ref.current.scrollTop = scrollTop;
+    });
+
+    requestAnimationFrame(() => {
+      isSyncing.current = false;
+    });
+  };
 
   if (!story) {
     return (
-      <Container sx={{ p: { xs: 1, sm: 2, md: 3 }, textAlign: 'center', maxWidth: 'md' }}>
-        <Typography variant="h5" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem', md: '2rem' } }}>
-          סיפור לא נמצא
-        </Typography>
-        <Button
-          component={Link}
-          to="/"
-          variant="contained"
-          sx={{ mt: 2, width: { xs: '100%', sm: 'auto' } }}
-        >
+      <Container sx={{ textAlign: 'center' }}>
+        <Typography variant="h5">סיפור לא נמצא</Typography>
+        <Button component={Link} to="/" variant="contained" sx={{ mt: 2 }}>
           חזור לדף הבית
         </Button>
       </Container>
@@ -52,60 +78,81 @@ const StoryPage = () => {
   }
 
   return (
-    <Container sx={{ p: { xs: 1, sm: 2, md: 3 }, textAlign: 'center', maxWidth: 'lg' }}>
-      <Document
-        file={story.pdf}
-        loading={
+    <Container
+      sx={{
+        p: 2,
+        maxWidth: 'lg',
+        height: "calc(100vh - 64px)",
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: "hidden",
+      }}
+    >
+      {!loading && !error && (
+        <Box sx={{ display: 'flex', gap: 2, flex: 1, minHeight: 0 }}>
+          {/* גולל שמאלי */}
           <Box
-            display="flex"
-            justifyContent="center"
-            alignItems="center"
-            minHeight="60vh"
+            ref={leftRef}
+            sx={{
+              width: "20px",
+              overflowY: "auto",
+              height: "100%",
+              cursor: "pointer",
+            }}
+            onScroll={() => syncScroll(leftRef, [contentRef, rightRef])}
           >
-            <CircularProgress size={80} />
+            <Box sx={{ height: scrollHeight }} />
           </Box>
-        }
-        onLoadSuccess={({ numPages }) => {
-          setNumPages(numPages);
-          setError(null);
-          setLoading(false);
-        }}
-        onLoadError={(e) => setError(e.message)}
-      >
-        {error && (
-          <Typography color="error" sx={{ mb: 2 }}>
-            שגיאה בטעינת הקובץ: {error}
-          </Typography>
-        )}
 
-        {!loading && numPages &&
-          Array.from({ length: numPages }, (_, i) => (
-            <Box
-              key={i}
-              display="flex"
-              justifyContent="center"
-              mb={2}
+          {/* טקסט מרכזי */}
+          <Box
+            ref={contentRef}
+            sx={{
+              flex: 1,
+              p: 2,
+              height: "100%",
+              overflowY: "auto",
+              position: "relative",
+              "&::-webkit-scrollbar": { width: "10px" },
+            }}
+            onScroll={() => syncScroll(contentRef, [leftRef, rightRef])}
+          >
+            <Typography
+              variant="body1"
+              align='right'
+              sx={{
+                fontSize: "1rem",
+                lineHeight: 1.9,
+                direction: "rtl",
+                whiteSpace: "pre-wrap",
+                unicodeBidi: "plaintext",
+              }}
             >
-              <Page
-                pageNumber={i + 1}
-                renderAnnotationLayer={false}
-                renderTextLayer
-                width={pageWidth}
-                scale={0.9}
-              />
-            </Box>
-          ))}
-      </Document>
+              {content}
+            </Typography>
 
+          </Box>
+          {/* גולל ימני */}
+          <Box
+            ref={rightRef}
+            sx={{
+              width: "20px",
+              overflowY: "auto",
+              height: "100%",
+              cursor: "pointer"
+            }}
+            onScroll={() => syncScroll(rightRef, [contentRef, leftRef])}
+          >
+            <Box sx={{ height: scrollHeight }} />
+          </Box>
+        </Box>
+      )}
       {!loading && (
-        <Button
-          component={Link}
-          to="/"
-          variant="contained"
-          sx={{ mt: 3, width: { xs: '100%', sm: 'auto' } }}
-        >
-          חזור לדף הבית
-        </Button>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 3 }}>
+          <Button component={Link} to="/" variant="contained">
+            חזור לדף הבית
+          </Button>
+        </Box>
       )}
     </Container>
   );
