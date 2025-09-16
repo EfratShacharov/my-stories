@@ -85,6 +85,13 @@ const StoryPage = () => {
     setNewComment("");
   };
 
+  const isAllowedLine = (line) => {
+    const noSpace = line.replace(/\s/g, '');
+    if (noSpace === '') return true;
+    const allowedRegex = /^[\u05D0-\u05EA\u05F3\u05F4!?"'.,()-]+$/u;
+    return allowedRegex.test(noSpace);
+  }
+
   return (
     <Container
       sx={{
@@ -127,19 +134,48 @@ const StoryPage = () => {
             }}
             onScroll={() => syncScroll(contentRef, [leftRef, rightRef])}
           >
-            <Typography
-              variant="body1"
-              align='right'
-              sx={{
-                fontSize: "1rem",
-                lineHeight: 1.9,
-                direction: "rtl",
-                whiteSpace: "pre-wrap",
-                unicodeBidi: "plaintext",
-              }}
-            >
-              {content}
-            </Typography>
+            {content.split("\n").map((line, idx) => {
+              const trimmed = line.trim();
+
+              if (trimmed === "") {
+                return <Box key={idx} sx={{ height: "0.6em" }} />;
+              }
+              if (isAllowedLine(line)) {
+                return (
+                  <Typography
+                    key={idx}
+                    variant='body1'
+                    align='right'
+                    sx={{
+                      fontSize: "1rem",
+                      lineHeight: 1.9,
+                      direction: "rtl",
+                      whiteSpace: "pre-wrap",
+                      unicodeBidi: "plaintext",
+                      mb: 0.5,
+                    }}
+                  >
+                    {line}
+                  </Typography>
+                );
+              }
+              else {
+                return (
+                  <Box key={idx} sx={{ textAlign: "center", my: 2 }}>
+                    <Typography
+                      variant='body1'
+                      sx={{
+                        fontSize: "1rem",
+                        lineHeight: 1.9,
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {line}
+                    </Typography>
+                  </Box>
+                );
+              }
+            })}
           </Box>
 
           {/* גולל ימני */}
@@ -178,15 +214,18 @@ const StoryPage = () => {
             </Box>
           </Box>
         </Box>
-      )}
-      {!loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 3 }}>
-          <Button component={Link} to="/" variant="contained">
-            חזור לדף הבית
-          </Button>
-        </Box>
-      )}
-    </Container>
+      )
+      }
+      {
+        !loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 3 }}>
+            <Button component={Link} to="/" variant="contained">
+              חזור לדף הבית
+            </Button>
+          </Box>
+        )
+      }
+    </Container >
   );
 };
 
