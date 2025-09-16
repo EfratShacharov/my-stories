@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useComments } from '../context/CommentsContext';
 import stories from './Stories';
+import DownloadIcon from '@mui/icons-material/Download';
 
 const StoryPage = () => {
   const { id } = useParams();
@@ -90,6 +91,15 @@ const StoryPage = () => {
     if (noSpace === '') return true;
     const allowedRegex = /^[\u05D0-\u05EA\u05F3\u05F4!?"'.,()-]+$/u;
     return allowedRegex.test(noSpace);
+  }
+
+  const handleDownloadPDF = () => {
+    if (story?.pdf) {
+      const link = document.createElement('a');
+      link.href = story.pdf;
+      link.download = story.title + ".pdf";
+      link.click();
+    }
   }
 
   return (
@@ -219,6 +229,13 @@ const StoryPage = () => {
       {
         !loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 3 }}>
+            <Button
+              variant='contained'
+              color='secondary'
+              startIcon={< DownloadIcon />}
+              onClick={handleDownloadPDF}
+            >
+            </Button>
             <Button component={Link} to="/" variant="contained">
               חזור לדף הבית
             </Button>
