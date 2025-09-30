@@ -1,18 +1,26 @@
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import React, { createContext, useState, useContext } from "react";
+import { db } from "../firebase";
 
 const CommentsContext = createContext();
 
 export const CommentsProvider = ({ children }) => {
     const [comments, setComments] = useState([]);
 
-    const addComment = (storyId, subject, text) => {
+    const addComment = async (storyId, subject, text) => {
         const newComment = {
-            id: Date.now(),
             storyId,
             subject,
             text,
+            timestamp: serverTimestamp(),
         };
-        setComments((prev) => [...prev, newComment]);
+
+        try {
+            const docRef = await addDoc(collection(db, "comments"), newComment);
+            setComments((prev) => [...prev, { id: docRef.id, ...newComment }]);
+        } catch (error) {
+            console.error("Error adding comment: ", error);
+        }
     };
 
     return (

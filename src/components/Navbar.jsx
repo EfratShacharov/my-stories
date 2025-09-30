@@ -10,7 +10,7 @@ const Navbar = () => {
     <AppBar position="fixed" sx={{ top: 0 }}>
       <Toolbar style={{ justifyContent: 'space-between' }}>
         <Typography variant="h6">
-          סיפורים שלי
+          הסיפורים שלי
         </Typography>
         <div>
           <Button color="inherit" component={Link} to="/comments">תגובות</Button>
