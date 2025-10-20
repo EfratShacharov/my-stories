@@ -12,7 +12,7 @@ async function extractTextFromDocx(url, maxLines = 5, wordsPerLine = 17) {
     text = text.replace(/[^א-ת\s.,!?:;"]/g, " ").replace(/\s+/g, " ").trim();
 
     const words = text.split(" ").filter(Boolean);
-    const indexOfMarker = -1;
+    let indexOfMarker = -1;
     const regex = /תש.\\"?/;
     for (let i = 0; i < words.length; i++) {
         if (regex.test(words[i])) {

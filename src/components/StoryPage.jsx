@@ -11,49 +11,99 @@ const StoryPage = () => {
   const story = stories.find(s => s.id === parseInt(id, 10));
 
   const { addComment } = useComments();
-  const [newComment, setNewComment] = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    comment: ""
+  });
+  const [errors, setErrors] = useState({
+    name: false,
+    email: false,
+    comment: false
+  });
+  const [successMessage, setSuccessMessage] = useState("");
   const [content, setContent] = useState("");
-  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [scrollHeight, setScrollHeight] = useState(0);
+  const [error, setError] = useState(null);
 
   const contentRef = useRef(null);
   const leftRef = useRef(null);
   const rightRef = useRef(null);
   const isSyncing = useRef(false);
+  const [scrollHeight, setScrollHeight] = useState(0);
 
+  // ============================
+  // Effects
+  // ============================
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "auto";
-    };
+    return () => { document.body.style.overflow = "auto"; };
   }, []);
 
   useEffect(() => {
-    if (contentRef.current) {
-      setScrollHeight(contentRef.current.scrollHeight);
-    }
+    if (contentRef.current) { setScrollHeight(contentRef.current.scrollHeight); }
   }, [content, loading]);
 
   useEffect(() => {
-    if (story?.docx) {
-      fetch(story.docx)
-        .then(res => res.arrayBuffer())
-        .then(buffer => mammoth.extractRawText({ arrayBuffer: buffer }))
-        .then(result => {
-          const lines = result.value.split("\n");
-          let filtered = lines.filter(line => !line.includes(")") && !/[A-Za-z]/.test(line));
-          filtered = filtered.filter(line => line.trim() !== "");
-          setContent(filtered.join("\n"));
-          setError(null);
-          setLoading(false);
-        })
-        .catch(err => {
-          setError(err.message);
-          setLoading(false);
-        });
-    }
+    if (!story?.docx) return;
+
+    fetch(story.docx)
+      .then(res => res.arrayBuffer())
+      .then(buffer => mammoth.extractRawText({ arrayBuffer: buffer }))
+      .then(result => {
+        const lines = result.value.split("\n");
+        let filtered = lines.filter(line => !line.includes(")") && !/[A-Za-z]/.test(line));
+        filtered = filtered.filter(line => line.trim() !== "");
+        setContent(filtered.join("\n"));
+        setError(null);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
   }, [story]);
+
+  // ============================
+  // פונקציות
+  // ============================
+  const handleInputChange = (field) => (e) => {
+    setForm(prev => ({ ...prev, [field]: e.target.value }));
+    setErrors(prev => ({ ...prev, [field]: false }));
+  };
+
+  const handleSubmit = async () => {
+    let tempErrors = { ...errors };
+    let hasError = false;
+
+    if (!form.name.trim()) {
+      tempErrors.name = true;
+      hasError = true;
+    }
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!form.email.trim() || !emailRegex.test(form.email.trim())) {
+      tempErrors.email = true;
+      hasError = true;
+    }
+    if (!form.comment.trim()) {
+      tempErrors.comment = true;
+      hasError = true;
+    }
+
+    if (hasError) {
+      setErrors(tempErrors);
+      return;
+    }
+
+    await addComment(form.name, story.id, story.title, form.comment, form.email);
+
+    // איפוס השדות לאחר שליחה
+    setForm({ name: "", email: "", comment: "" });
+    setErrors({ name: false, email: false, comment: false });
+
+    setSuccessMessage("!!!התגובה שלך נחתה בבטחה במערכת! תודה רבה")
+    setTimeout(() => setSuccessMessage(""), 3000);
+  };
 
   const syncScroll = (sourceRef, targetRefs) => {
     if (!sourceRef.current || isSyncing.current) return;
@@ -69,6 +119,21 @@ const StoryPage = () => {
     });
   };
 
+  const handleDownloadPDF = () => {
+    if (story?.pdf) {
+      const link = document.createElement('a');
+      link.href = story.pdf;
+      link.download = story.title + ".pdf";
+      link.click();
+    }
+  }
+
+  const isAllowedLine = (line) => {
+    const noSpace = line.replace(/\s/g, '');
+    if (noSpace === '') return true;
+    return /^[\u05D0-\u05EA\u05F3\u05F4!?"'.,()-]+$/u.test(noSpace);
+  }
+
   if (!story) {
     return (
       <Container sx={{ textAlign: 'center' }}>
@@ -80,28 +145,9 @@ const StoryPage = () => {
     );
   }
 
-  const handleSubmit = () => {
-    if (!newComment.trim()) return;
-    addComment(story.id, story.title, newComment);
-    setNewComment("");
-  };
-
-  const isAllowedLine = (line) => {
-    const noSpace = line.replace(/\s/g, '');
-    if (noSpace === '') return true;
-    const allowedRegex = /^[\u05D0-\u05EA\u05F3\u05F4!?"'.,()-]+$/u;
-    return allowedRegex.test(noSpace);
-  }
-
-  const handleDownloadPDF = () => {
-    if (story?.pdf) {
-      const link = document.createElement('a');
-      link.href = story.pdf;
-      link.download = story.title + ".pdf";
-      link.click();
-    }
-  }
-
+  // ============================
+  // תצוגת הרכיב
+  // ============================
   return (
     <Container
       sx={{
@@ -208,15 +254,66 @@ const StoryPage = () => {
               תנו את תגובתכם על הסיפור
             </Typography>
             <TextField
-              label="תוכן התגובה"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
+              label={
+                <span>
+                  שם<span style={{ color: "red" }}>*</span>
+                </span>
+              }
+              value={form.name}
+              onChange={handleInputChange("name")}
+              fullWidth
+              sx={{ mt: 2 }}
+              InputProps={{ style: { textAlign: "right" } }}
+              error={errors.name}
+              helperText={errors.name ? "אנא הזן שם" : ""}
+            />
+            <TextField
+              label={
+                <span>
+                  <span style={{ color: "red" }}>*</span>מייל
+                </span>
+              }
+              value={form.email}
+              // onChange={handleInputChange("email")}
+              fullWidth
+              dir="rtl"
+              sx={{ mt: 2 }}
+              InputProps={{ style: { textAlign: "right" } }}
+              onChange={(e) => {
+                const value = e.target.value;
+                setForm((prev) => ({ ...prev, email: value }));
+
+                // בדיקת תקינות בזמן אמת
+                const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                const isValid = emailRegex.test(value.trim());
+
+                // עדכון השגיאה דינמית כמו ב־CommentPage
+                setErrors((prev) => ({ ...prev, email: !isValid }));
+              }}
+              error={errors.email}
+              helperText={errors.email ? "אנא הזן כתובת מייל תקינה" : ""}
+            />
+            <TextField
+              label={
+                <span>
+                  תוכן התגובה<span style={{ color: "red" }}>*</span>
+                </span>
+              }
+              value={form.comment}
+              onChange={handleInputChange("comment")}
               multiline
               rows={4}
               fullWidth
               sx={{ mt: 2 }}
               InputProps={{ style: { textAlign: "right" } }}
+              error={errors.comment}
+              helperText={errors.comment ? "אנא הזן תוכן תגובה" : ""}
             />
+            {successMessage && (
+              <Typography color="success.main" sx={{ mt: 2, mb: 1 }}>
+                {successMessage}
+              </Typography>
+            )}
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
               <Button variant="contained" color="primary" onClick={handleSubmit}>
                 שלח תגובה
