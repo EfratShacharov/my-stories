@@ -1,6 +1,6 @@
-import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from "firebase/firestore";
+// import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from "firebase/firestore";
 import React, { createContext, useState, useContext, useEffect } from "react";
-import { db } from "../firebase";
+// import { db } from "../firebase";
 
 const CommentsContext = createContext();
 
@@ -15,33 +15,40 @@ export const CommentsProvider = ({ children }) => {
         }
 
         //טוען בזמן אמת מ fireBase
-        const q = query(collection(db, "comments"), orderBy("timestamp", "desc"));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const allComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setComments(allComments);
-            localStorage.setItem("comments",JSON.stringify(allComments));
-        }, (error) => {
-            console.error("Error fetching comments: ", error);
-        });
+        // const q = query(collection(db, "comments"), orderBy("timestamp", "desc"));
+        // const unsubscribe = onSnapshot(q, (snapshot) => {
+        //     const allComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        //     setComments(allComments);
+        //     localStorage.setItem("comments", JSON.stringify(allComments));
+        // }, (error) => {
+        //     console.error("Error fetching comments: ", error);
+        // });
 
-        return () => unsubscribe();
-    },[]);
+        // return () => unsubscribe();
+    }, []);
 
     const addComment = async (name, storyId, subject, text, email) => {
         const newComment = {
+            // id: Date.now(),
             name: name || "",
             storyId,
             subject,
             text,
             email: email || "",
-            timestamp: serverTimestamp(),
+            timestamp: Date.now(),
         };
 
-        try {
-            await addDoc(collection(db, "comments"), newComment);
-        } catch (error) {
-            console.error("Error adding comment: ", error);
-        }
+        setComments(prev => {
+            const updated = [newComment, ...prev];
+            localStorage.setItem("comments", JSON.stringify(updated));
+            return updated;
+        });
+
+        // try {
+        //     await addDoc(collection(db, "comments"), newComment);
+        // } catch (error) {
+        //     console.error("Error adding comment: ", error);
+        // }
     };
 
     return (
