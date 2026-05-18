@@ -80,14 +80,23 @@ const AdminLogin = ({ setIsAdmin }) => {
         setLoading(true);
 
         try {
-            // שולחים OTP בלבד
+            const adminEmail = process.env.REACT_APP_ADMIN_EMAIL;
+            const adminPassword = process.env.REACT_APP_ADMIN_PASSWORD;
+
+            if (email !== adminEmail || password !== adminPassword) {
+                setErrorMessage("אחד מהערכים שגוי");
+                setLoading(false);
+                return;
+            }
+
+            // רק אם המייל והסיסמה נכונים - שולחים OTP
             await sendOtp(email);
             setEmail("");
             setPassword("");
             setStep(2);
         } catch (err) {
             console.error(err);
-            setErrorMessage("אחד מהערכים שגוי");
+            setErrorMessage("אירעה שגיאה");
         } finally {
             setLoading(false);
         }
@@ -131,7 +140,7 @@ const AdminLogin = ({ setIsAdmin }) => {
 
         // כאן מסמנים שהמנהל נכנס בהצלחה
         setIsAdmin(true);
-        localStorage.setItem("isAdmin",true);
+        localStorage.setItem("isAdmin", true);
 
         //סוגרים את חלון ההתחברות
         handleClose();

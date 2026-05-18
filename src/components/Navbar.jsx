@@ -21,6 +21,7 @@ const Navbar = ({ isAdmin, setIsAdmin }) => {
           <Button color="inherit" component={Link} to="/">דף הבית</Button>
           {/* כפתור למנהל בלבד */}
           {isAdmin && <Button color="inherit" component={Link} to="/files">ניהול קבצים</Button>}
+          {isAdmin && <Button color="inherit" component={Link} to="/manage-comments">ניהול תגובות</Button>}
         </div>
       </Toolbar>
     </AppBar>
