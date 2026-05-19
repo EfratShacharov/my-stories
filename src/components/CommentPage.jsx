@@ -2,6 +2,29 @@ import { Autocomplete, Box, Button, Container, TextField, Typography } from "@mu
 import React, { useState } from "react";
 import { useComments } from "../context/CommentsContext";
 import stories from "./Stories";
+import { comment } from "stylis";
+import { supabase } from "../supabase";
+
+const addComment = async (name, storyId, subject, text, email, isAdmin = false, parentId = null) => {
+    const newComment = {
+        name: name || "",
+        story_id: storyId,
+        story_title: subject,
+        comment: text,
+        email: email || "",
+        is_admin: isAdmin,
+        status: isAdmin ? "approved" : "pending",
+        parent_id: parentId || null,
+    };
+
+    const { error } = await supabase
+        .from("comments")
+        .insert([newComment]);
+
+    if (error) {
+        console.error("שגיאה בהוספת התגובה:", error);
+    }
+};
 
 const CommentPage = ({ isAdmin }) => {
     const { comments, addComment } = useComments();
