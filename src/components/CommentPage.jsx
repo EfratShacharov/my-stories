@@ -2,8 +2,31 @@ import { Autocomplete, Box, Button, Container, TextField, Typography } from "@mu
 import React, { useState } from "react";
 import { useComments } from "../context/CommentsContext";
 import stories from "./Stories";
+import { comment } from "stylis";
+import { supabase } from "../supabase";
 
-const CommentPage = () => {
+const addComment = async (name, storyId, subject, text, email, isAdmin = false, parentId = null) => {
+    const newComment = {
+        name: name || "",
+        story_id: storyId,
+        story_title: subject,
+        comment: text,
+        email: email || "",
+        is_admin: isAdmin,
+        status: isAdmin ? "approved" : "pending",
+        parent_id: parentId || null,
+    };
+
+    const { error } = await supabase
+        .from("comments")
+        .insert([newComment]);
+
+    if (error) {
+        console.error("שגיאה בהוספת התגובה:", error);
+    }
+};
+
+const CommentPage = ({ isAdmin }) => {
     const { comments, addComment } = useComments();
     const [text, setText] = useState("");
     const [selectedStory, setSelectedStory] = useState(null);
@@ -51,8 +74,8 @@ const CommentPage = () => {
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
         const newErrors = {
-            name: !name.trim(),
-            email: !email.trim() || !emailRegex.test(email.trim()),
+            name: isAdmin ? false : !name.trim(),
+            email: isAdmin ? false : !email.trim() || !emailRegex.test(email.trim()),
             subjectType: !subjectType,
             selectedStory: subjectType === "story" ? !selectedStory : false,
             customSubject: subjectType === "other" ? !customSubject.trim() : false,
@@ -66,7 +89,7 @@ const CommentPage = () => {
         let storyId = subjectType === "story" ? selectedStory.id : null;
         let subject = subjectType === "story" ? selectedStory.label : customSubject.trim();
 
-        await addComment(name, storyId, subject, text.trim(), email.trim());
+        await addComment(name, storyId, subject, text.trim(), email.trim(), isAdmin);
 
         resetForm();
 
@@ -80,9 +103,9 @@ const CommentPage = () => {
                 התגובות שהתקבלו במערכת
             </Typography>
 
-            {comments.map((c) => {
-                const story = stories.find((s) => s.id === c.storyId);
-                return (
+            {comments
+                .filter((c) => c.status === "approved")
+                .map((c) => (
                     <Box
                         key={c.id}
                         dir="rtl"
@@ -91,69 +114,95 @@ const CommentPage = () => {
                             p: 2,
                             border: '1px solid #ccc',
                             borderRadius: 2,
-                            backgroundColor: "#fafafa",
+                            backgroundColor: c.is_admin ? "#fff3e0" : "#fafafa",
                         }}
                     >
-                        <Typography variant="subtitle2">
-                            נושא התגובה: {story ? story.title : c.subject}
-                        </Typography>
-                        <Typography>
-                            {c.text}
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <Typography variant="caption" color="text.seconday">
+                                {new Date(c.created_at).toLocaleString("he-IL")}
+                            </Typography>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                {c.is_admin && (
+                                    <Box sx={{
+                                        backgroundColor: "#e91e8c",
+                                        color: "white",
+                                        borderRadius: "4px",
+                                        px: 1,
+                                        py: 0.2,
+                                        fontSize: "0.75rem",
+                                        fontWeight: "bold"
+                                    }}>
+                                        אדמין
+                                    </Box>
+                                )}
+                                <Typography variant="subtitle1" fontWeight="bold">
+                                    {c.name}
+                                </Typography>
+                            </Box>
+                        </Box>
+                        <Typography sx={{ mt: 1 }}>
+                            {c.comment}
                         </Typography>
                     </Box>
-                );
-            })}
+                ))
+            }
+
             {/* טופס להוספת תגובה */}
             <Box sx={{ mt: 4 }}>
                 <Typography variant="h6" align="right">
                     הוסף תגובה משלך
                 </Typography>
-                <TextField
-                    label={
-                        <span>
-                            <span style={{ color: "red" }}>*</span>שם
-                        </span>
-                    }
-                    fullWidth
-                    sx={{ mt: 2 }}
-                    dir="rtl"
-                    InputProps={{ style: { textAlign: "right" } }}
-                    value={name}
-                    onChange={(e) => {
-                        const value = e.target.value;
-                        setName(value);
+                {!isAdmin && (
+                    <>
+                        <TextField
+                            label={
+                                <span>
+                                    <span style={{ color: "red" }}>*</span>שם
+                                </span>
+                            }
+                            fullWidth
+                            sx={{ mt: 2 }}
+                            dir="rtl"
+                            InputProps={{ style: { textAlign: "right" } }}
+                            value={name}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setName(value);
 
-                        // בדיקה דינמית של השם – חייב להיות לא ריק
-                        setErrors((prev) => ({ ...prev, name: !value.trim() }));
-                    }}
-                    error={errors.name}
-                    helperText={errors.name ? "אנא הזן שם" : ""}
-                />
-                <TextField
-                    label={
-                        <span>
-                            <span style={{ color: "red" }}>*</span>מייל
-                        </span>
-                    }
-                    fullWidth
-                    sx={{ mt: 2 }}
-                    dir="rtl"
-                    InputProps={{ style: { textAlign: "right" } }}
-                    value={email}
-                    onChange={(e) => {
-                        const value = e.target.value;
-                        setEmail(value);
+                                // בדיקה דינמית של השם – חייב להיות לא ריק
+                                setErrors((prev) => ({ ...prev, name: !value.trim() }));
+                            }}
+                            error={errors.name}
+                            helperText={errors.name ? "אנא הזן שם" : ""}
+                        />
+                        <TextField
+                            label={
+                                <span>
+                                    <span style={{ color: "red" }}>*</span>מייל
+                                </span>
+                            }
+                            fullWidth
+                            sx={{ mt: 2 }}
+                            dir="rtl"
+                            InputProps={{ style: { textAlign: "right" } }}
+                            value={email}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setEmail(value);
 
-                        // בדיקה מלאה של המייל
-                        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-                        const isValid = emailRegex.test(value.trim());
+                                // בדיקה מלאה של המייל
+                                const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                                const isValid = emailRegex.test(value.trim());
 
-                        // עדכון שגיאה דינמית בזמן אמת
-                        setErrors((prev) => ({ ...prev, email: !isValid }));
-                    }}
-                    error={errors.email}
-                    helperText={errors.email ? "אנא הזן כתובת מייל תקינה" : ""}
-                />
+                                // עדכון שגיאה דינמית בזמן אמת
+                                setErrors((prev) => ({ ...prev, email: !isValid }));
+                            }}
+                            error={errors.email}
+                            helperText={errors.email ? "אנא הזן כתובת מייל תקינה" : ""}
+                        />
+                    </>
+                )}
+
                 <Autocomplete
                     options={subjectOptions}
                     getOptionLabel={(option) => option.label}
