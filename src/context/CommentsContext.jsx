@@ -34,7 +34,7 @@ export const CommentsProvider = ({ children }) => {
         return () => supabase.removeChannel(subscription);
     }, []);
 
-    const addComment = async (name, storyId, subject, text, email, isAdmin = false) => {
+    const addComment = async (name, storyId, subject, text, email, isAdmin = false, parentId = null) => {
         const newComment = {
             name: name || "",
             story_id: storyId,
@@ -43,6 +43,7 @@ export const CommentsProvider = ({ children }) => {
             email: email || "",
             is_admin: isAdmin,
             status: isAdmin ? "approved" : "pending",
+            parent_id: parentId || null,
         };
 
         const { error } = await supabase
