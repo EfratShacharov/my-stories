@@ -1,6 +1,5 @@
-// import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from "firebase/firestore";
 import React, { createContext, useState, useContext, useEffect } from "react";
-// import { db } from "../firebase";
+import { supabase } from "../supabase";
 
 const CommentsContext = createContext();
 
@@ -8,47 +7,53 @@ export const CommentsProvider = ({ children }) => {
     const [comments, setComments] = useState([]);
 
     useEffect(() => {
-        //טוען מהמקומי
-        const saved = localStorage.getItem("comments");
-        if (saved) {
-            setComments(JSON.parse(saved));
-        }
+        //טוען תגובות מ - Supabase
+        const fetchComments = async () => {
+            const { data, error } = await supabase
+                .from("comments")
+                .select("*")
+                .order("created_at", { ascending: false });
 
-        //טוען בזמן אמת מ fireBase
-        // const q = query(collection(db, "comments"), orderBy("timestamp", "desc"));
-        // const unsubscribe = onSnapshot(q, (snapshot) => {
-        //     const allComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        //     setComments(allComments);
-        //     localStorage.setItem("comments", JSON.stringify(allComments));
-        // }, (error) => {
-        //     console.error("Error fetching comments: ", error);
-        // });
-
-        // return () => unsubscribe();
-    }, []);
-
-    const addComment = async (name, storyId, subject, text, email) => {
-        const newComment = {
-            // id: Date.now(),
-            name: name || "",
-            storyId,
-            subject,
-            text,
-            email: email || "",
-            timestamp: Date.now(),
+            if (error) {
+                console.error("שגיאה באחזור התגובות:", error);
+            } else {
+                setComments(data);
+            }
         };
 
-        setComments(prev => {
-            const updated = [newComment, ...prev];
-            localStorage.setItem("comments", JSON.stringify(updated));
-            return updated;
-        });
+        fetchComments();
 
-        // try {
-        //     await addDoc(collection(db, "comments"), newComment);
-        // } catch (error) {
-        //     console.error("Error adding comment: ", error);
-        // }
+        // האזנה לשינויים בזמן אמת
+        const subscription = supabase
+            .channel("comments")
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "comments" }, (payload) => {
+                setComments(prev => [payload.new, ...prev]);
+            })
+            .subscribe();
+
+        return () => supabase.removeChannel(subscription);
+    }, []);
+
+    const addComment = async (name, storyId, subject, text, email, isAdmin = false, parentId = null) => {
+        const newComment = {
+            name: name || "",
+            story_id: storyId,
+            story_title: subject,
+            comment: text,
+            email: email || "",
+            is_admin: isAdmin,
+            status: isAdmin ? "approved" : "pending",
+            parent_id: parentId || null,
+        };
+
+        const { error } = await supabase
+            .from("comments")
+            .insert([newComment]);
+
+        if (error) {
+            console.error("שגיאה בהוספת התגובה:", error);
+        }
+
     };
 
     return (

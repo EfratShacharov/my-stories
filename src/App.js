@@ -12,6 +12,7 @@ import StoryPage from './components/StoryPage';
 import './index.css';
 import { CommentsProvider } from './context/CommentsContext';
 import FileManager from './components/FileManager';
+import CommentsManager from './components/CommentsManager';
 
 // יצירת cache ל־RTL
 const cacheRtl = createCache({
@@ -21,7 +22,7 @@ const cacheRtl = createCache({
 
 // יצירת Theme עם RTL
 const theme = createTheme({
-  direction: 'rtl', // משנה את כיוון כל רכיבי MUI ל־Right-to-Left
+  direction: 'rtl',
 });
 
 function App() {
@@ -41,8 +42,9 @@ function App() {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/story/:id" element={<StoryPage />} />
-                <Route path="/comments" element={<CommentPage />} />
+                <Route path="/comments" element={<CommentPage isAdmin={isAdmin} />} />
                 {isAdmin && <Route path='/files' element={<FileManager />} />}
+                {isAdmin && <Route path='/manage-comments' element={<CommentsManager />} />}
               </Routes>
             </div>
           </Router>
