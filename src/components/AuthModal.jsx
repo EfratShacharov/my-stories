@@ -125,6 +125,22 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
 
     const resendOtp = () => sendOtp(otpEmail);
 
+    const handleKeyDown = (e) => {
+        if (e.key === "Enter") {
+            if (mode === "login") {
+                handleLogin();
+            }
+
+            if (mode === "register") {
+                handleRegister();
+            }
+
+            if (mode === "otp") {
+                handleVerifyOtp();
+            }
+        }
+    };
+
     const handleOtpChange = (value, index) => {
         if (value.length > 1) {
             const arr = value.split("").slice(0, 6);
@@ -239,7 +255,13 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
                             value={email}
                             dir="ltr"
                             onChange={e => setEmail(e.target.value)}
-                            sx={{ mb: 2 }}
+                            onKeyDown={handleKeyDown}
+                            sx={{
+                                mb: 2,
+                                "& input": {
+                                    paddingRight: "25px"
+                                }
+                            }}
                         />
                         <TextField
                             label="סיסמה"
@@ -247,6 +269,7 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
                             fullWidth
                             value={password}
                             onChange={e => setPassword(e.target.value)}
+                            onKeyDown={handleKeyDown}
                             sx={{
                                 mb: 3,
                                 "& .MuiInputAdornment-positionEnd": {
@@ -285,16 +308,40 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
                 {/* מצב הרשמה */}
                 {mode === "register" && (
                     <>
-                        <TextField label="שם" fullWidth value={name}
-                            onChange={e => setName(e.target.value)} sx={{ mb: 2 }} />
-                        <TextField label="מייל" fullWidth value={email} dir="ltr"
-                            onChange={e => setEmail(e.target.value)} sx={{ mb: 2 }} />
+                        <TextField
+                            label="שם"
+                            fullWidth
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            sx={{
+                                mb: 2,
+                                "& input": {
+                                    paddingLeft: "20px"
+                                }
+                            }}
+                        />
+                        <TextField
+                            label="מייל"
+                            fullWidth
+                            value={email}
+                            dir="ltr"
+                            onChange={e => setEmail(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            sx={{
+                                mb: 2,
+                                "& input": {
+                                    paddingRight: "25px"
+                                }
+                            }}
+                        />
                         <TextField
                             label="סיסמה"
                             type={showPassword ? "text" : "password"}
                             fullWidth
                             value={password}
                             onChange={e => setPassword(e.target.value)}
+                            onKeyDown={handleKeyDown}
                             sx={{
                                 mb: 2,
                                 "& .MuiInputAdornment-positionEnd": {
@@ -367,6 +414,7 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
                                     inputRef={(el) => (inputsRef.current[index] = el)}
                                     value={digit}
                                     onChange={(e) => handleOtpChange(e.target.value, index)}
+                                    onKeyDown={handleKeyDown}
                                     inputProps={{
                                         maxLength: 1,
                                         style: {
