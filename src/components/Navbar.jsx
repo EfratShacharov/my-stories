@@ -9,7 +9,6 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 const Navbar = ({ isAdmin, session, userName, onAuthClick, onLogout }) => {
-  console.log("userName:", userName);
   const handlrLogout = async () => {
     await supabase.auth.signOut();
     onLogout();

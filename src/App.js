@@ -5,24 +5,24 @@ import React, { useEffect, useState } from 'react';
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { prefixer } from 'stylis';
 import rtlPlugin from 'stylis-plugin-rtl';
+
 import CommentPage from './components/CommentPage';
 import Home from './components/Home';
 import Navbar from './components/Navbar';
 import StoryPage from './components/StoryPage';
-import './index.css';
-import { CommentsProvider } from './context/CommentsContext';
 import FileManager from './components/FileManager';
 import CommentsManager from './components/CommentsManager';
-import { supabase } from './supabase';
 import AuthModal from './components/AuthModal';
 
-// יצירת cache ל־RTL
+import './index.css';
+import { CommentsProvider } from './context/CommentsContext';
+import { supabase } from './supabase';
+
 const cacheRtl = createCache({
   key: 'muirtl',
   stylisPlugins: [prefixer, rtlPlugin],
 });
 
-// יצירת Theme עם RTL
 const theme = createTheme({
   direction: 'rtl',
 });
@@ -32,32 +32,53 @@ function App() {
   const [session, setSession] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [userName, setUserName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [showUser, setShowUser] = useState(false);
 
-  const fetchUserName = async (session) => {
-    if (!session) return;
-    const { data, error } = await supabase
+  const loadUserData = async (userId) => {
+    if (!userId) {
+      setUserName("");
+      setIsAdmin(false);
+      return;
+    }
+
+    const { data } = await supabase
       .from("users")
-      .select("name")
-      .eq("id", session.user.id)
+      .select("name, is_admin")
+      .eq("id", userId)
       .maybeSingle();
-    console.log("data:", data);
-    console.log("error:", error);
-    if (data) setUserName(data.name);
-  }
+
+    setUserName(data?.name || "");
+    setIsAdmin(data?.is_admin === true);
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      fetchUserName(session);
+      if (session?.user?.id) {
+        setSession(session);
+        loadUserData(session.user.id).then(() => {
+          setShowUser(true);
+        });
+      }
+      setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      setSession(session);
-      fetchUserName(session);
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        if (!session) {
+          // התנתקות
+          setUserName("");
+          setIsAdmin(false);
+          setShowUser(false);
+        }
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, []);
+
+  if (loading) return null;
 
   return (
     <CommentsProvider>
@@ -67,30 +88,60 @@ function App() {
           <Router>
             <Navbar
               isAdmin={isAdmin}
-              session={session}
+              session={showUser ? session : null}
               userName={userName}
               onAuthClick={() => setAuthOpen(true)}
-              onLogout={() => {
+              onLogout={async () => {
+                await supabase.auth.signOut();
                 setIsAdmin(false);
                 setSession(null);
+                setUserName("");
+                setShowUser(false);
               }}
             />
+
             <div className="app-content">
               <Routes>
                 <Route path="/" element={<Home />} />
-                <Route path="/story/:id" element={<StoryPage session={session} onAuthClick={() => setAuthOpen(true)} />} />
-                <Route path="/comments" element={<CommentPage isAdmin={isAdmin} session={session} onAuthClick={() => setAuthOpen(true)} />} />
-                {isAdmin && <Route path='/files' element={<FileManager />} />}
-                {isAdmin && <Route path='/manage-comments' element={<CommentsManager />} />}
+                <Route
+                  path="/story/:id"
+                  element={
+                    <StoryPage
+                      session={session}
+                      onAuthClick={() => setAuthOpen(true)}
+                    />
+                  }
+                />
+                <Route
+                  path="/comments"
+                  element={
+                    <CommentPage
+                      isAdmin={isAdmin}
+                      session={session}
+                      onAuthClick={() => setAuthOpen(true)}
+                    />
+                  }
+                />
+                <Route
+                  path="/files"
+                  element={isAdmin ? <FileManager /> : <Home />}
+                />
+
+                <Route
+                  path="/manage-comments"
+                  element={isAdmin ? <CommentsManager /> : <Home />}
+                />
               </Routes>
             </div>
 
             <AuthModal
               open={authOpen}
               onClose={() => setAuthOpen(false)}
-              onLoginSuccess={(session, adminStatus) => {
-                setSession(session);
+              onLoginSuccess={async (sess, adminStatus) => {
+                setSession(sess);
                 setIsAdmin(adminStatus || false);
+                await loadUserData(sess?.user?.id);
+                setShowUser(true);
                 setAuthOpen(false);
               }}
             />
