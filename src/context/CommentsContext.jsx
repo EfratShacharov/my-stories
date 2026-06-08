@@ -6,54 +6,59 @@ const CommentsContext = createContext();
 export const CommentsProvider = ({ children }) => {
     const [comments, setComments] = useState([]);
 
+    // טעינה ראשונית
     useEffect(() => {
-        //טוען תגובות מ - Supabase
         const fetchComments = async () => {
             const { data, error } = await supabase
                 .from("comments")
                 .select("*")
                 .order("created_at", { ascending: false });
 
-            if (error) {
-                console.error("שגיאה באחזור התגובות:", error);
-            } else {
-                setComments(data);
-            }
+            if (!error) setComments(data);
         };
 
         fetchComments();
-
-        // האזנה לשינויים בזמן אמת
-        const subscription = supabase
-            .channel("comments")
-            .on("postgres_changes", { event: "INSERT", schema: "public", table: "comments" }, (payload) => {
-                setComments(prev => [payload.new, ...prev]);
-            })
-            .subscribe();
-
-        return () => supabase.removeChannel(subscription);
     }, []);
 
-    const addComment = async (name, storyId, subject, text, email, isAdmin = false, parentId = null) => {
+    const addComment = async (name, storyId, subject, text, email, isAdmin = false, parentId = null, userId = null) => {
+
+        let resolvedName = name || "";
+        let resolvedEmail = email || "";
+
+        if (userId) {
+            const { data } = await supabase
+                .from("users")
+                .select("name, email")
+                .eq("id", userId)
+                .maybeSingle();
+
+            if (data) {
+                resolvedName = data.name || "";
+                resolvedEmail = data.email || "";
+            }
+        }
+
         const newComment = {
-            name: name || "",
+            name: resolvedName,
             story_id: storyId,
             story_title: subject,
             comment: text,
-            email: email || "",
+            email: resolvedEmail,
             is_admin: isAdmin,
             status: isAdmin ? "approved" : "pending",
             parent_id: parentId || null,
         };
+
+        console.log("newComment:", newComment);
+        const session = await supabase.auth.getSession();
 
         const { error } = await supabase
             .from("comments")
             .insert([newComment]);
 
         if (error) {
-            console.error("שגיאה בהוספת התגובה:", error);
+            console.error("INSERT ERROR:", error);
         }
-
     };
 
     return (

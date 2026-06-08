@@ -1,7 +1,7 @@
 import { supabase } from "../supabase";
 import { Alert, Box, Button, Checkbox, CircularProgress, Divider, FormControlLabel, IconButton, Modal, TextField, Typography } from "@mui/material";
 import CloseIcon from '@mui/icons-material/Close';
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import emailjs from 'emailjs-com';
 import InputAdornment from '@mui/material/InputAdornment';
 import Visibility from '@mui/icons-material/Visibility';
@@ -168,9 +168,8 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
         }
 
         const { data } = await supabase.auth.getSession();
-        onLoginSuccess(data.session, true);
         handleClose();
-        resetForm();
+        onLoginSuccess(data.session, true);
     };
 
     const handleRegister = async () => {
@@ -223,9 +222,16 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
         }]);
 
         setLoading(false);
-        setMessage("נרשמת בהלצחה!!!");
         handleClose();
+        onLoginSuccess(data.session, false);
     };
+
+    useEffect(() => {
+        if (open) {
+            resetForm();
+            setMode("login");
+        }
+    }, [open]);
 
     return (
         <Modal open={open} onClose={handleClose}>

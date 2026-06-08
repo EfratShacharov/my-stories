@@ -1,33 +1,22 @@
-import { Autocomplete, Box, Button, Container, TextField, Typography } from "@mui/material";
+import {
+    Autocomplete,
+    Box,
+    Button,
+    Collapse,
+    Container,
+    TextField,
+    Typography
+} from "@mui/material";
+
 import React, { useState } from "react";
 import { useComments } from "../context/CommentsContext";
 import stories from "./Stories";
-import { comment } from "stylis";
-import { supabase } from "../supabase";
 
-const addComment = async (name, storyId, subject, text, email, isAdmin = false, parentId = null) => {
-    const newComment = {
-        name: name || "",
-        story_id: storyId,
-        story_title: subject,
-        comment: text,
-        email: email || "",
-        is_admin: isAdmin,
-        status: isAdmin ? "approved" : "pending",
-        parent_id: parentId || null,
-    };
-
-    const { error } = await supabase
-        .from("comments")
-        .insert([newComment]);
-
-    if (error) {
-        console.error("שגיאה בהוספת התגובה:", error);
-    }
-};
-
-const CommentPage = ({ isAdmin }) => {
+const CommentPage = ({ isAdmin, session }) => {
     const { comments, addComment } = useComments();
+
+    const [showForm, setShowForm] = useState(false);
+
     const [text, setText] = useState("");
     const [selectedStory, setSelectedStory] = useState(null);
     const [inputValue, setInputValue] = useState("");
@@ -37,10 +26,12 @@ const CommentPage = ({ isAdmin }) => {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [successMessage, setSuccessMessage] = useState("");
+
     const subjectOptions = [
         { label: "תגובה על סיפור", value: "story" },
         { label: "אחר", value: "other" }
     ];
+
     const [errors, setErrors] = useState({
         name: false,
         email: false,
@@ -50,7 +41,6 @@ const CommentPage = ({ isAdmin }) => {
         text: false,
     });
 
-    //איפוס שדות לאחר שליחת הטופס
     const resetForm = () => {
         setSubjectType(null);
         setSubjectInput("");
@@ -60,6 +50,7 @@ const CommentPage = ({ isAdmin }) => {
         setText("");
         setName("");
         setEmail("");
+
         setErrors({
             subjectType: false,
             selectedStory: false,
@@ -72,10 +63,11 @@ const CommentPage = ({ isAdmin }) => {
 
     const handleSubmit = async () => {
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        const isLoggedIn = !!session;
 
         const newErrors = {
-            name: isAdmin ? false : !name.trim(),
-            email: isAdmin ? false : !email.trim() || !emailRegex.test(email.trim()),
+            name: !isLoggedIn && !isAdmin ? !name.trim() : false,
+            email: !isLoggedIn && !isAdmin ? (!email.trim() || !emailRegex.test(email.trim())) : false,
             subjectType: !subjectType,
             selectedStory: subjectType === "story" ? !selectedStory : false,
             customSubject: subjectType === "other" ? !customSubject.trim() : false,
@@ -83,239 +75,305 @@ const CommentPage = ({ isAdmin }) => {
         };
 
         setErrors(newErrors);
-
         if (Object.values(newErrors).some(Boolean)) return;
 
-        let storyId = subjectType === "story" ? selectedStory.id : null;
-        let subject = subjectType === "story" ? selectedStory.label : customSubject.trim();
+        let storyId =
+            subjectType === "story"
+                ? selectedStory.id
+                : null;
 
-        await addComment(name, storyId, subject, text.trim(), email.trim(), isAdmin);
+        let subject =
+            subjectType === "story"
+                ? selectedStory.label
+                : customSubject.trim();
+                
+        await addComment(
+            name,
+            storyId,
+            subject,
+            text.trim(),
+            email.trim(),
+            false,
+            null,
+            session?.user?.id || null
+        );
 
         resetForm();
-
-        setSuccessMessage("!!!התגובה שלך נחתה בבטחה במערכת! תודה רבה");
+        setSuccessMessage("התגובה נשלחה וממתינה לאישור מנהל");
         setTimeout(() => setSuccessMessage(""), 3000);
     };
 
+    const approvedMainComments = comments.filter(
+        (c) =>
+            c.status === "approved" &&
+            c.parent_id === null
+    );
+
     return (
         <Container maxWidth="sm" sx={{ mt: 10 }}>
+
             <Typography variant="h4" gutterBottom align="right">
-                התגובות שהתקבלו במערכת
+                תגובות
             </Typography>
 
-            {comments
-                .filter((c) => c.status === "approved")
-                .map((c) => (
+            {approvedMainComments.map((c) => {
+                const adminReplies = comments.filter(
+                    (reply) =>
+                        reply.parent_id === c.id &&
+                        reply.status === "approved"
+                );
+
+                return (
                     <Box
                         key={c.id}
                         dir="rtl"
                         sx={{
                             mt: 2,
                             p: 2,
-                            border: '1px solid #ccc',
+                            border: "1px solid #ddd",
                             borderRadius: 2,
-                            backgroundColor: c.is_admin ? "#fff3e0" : "#fafafa",
+                            backgroundColor: "#fafafa",
                         }}
                     >
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Typography variant="caption" color="text.seconday">
+                        <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                            }}
+                        >
+                            <Typography
+                                variant="caption"
+                                color="text.secondary"
+                            >
                                 {new Date(c.created_at).toLocaleString("he-IL")}
                             </Typography>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                {c.is_admin && (
-                                    <Box sx={{
-                                        backgroundColor: "#e91e8c",
-                                        color: "white",
-                                        borderRadius: "4px",
-                                        px: 1,
-                                        py: 0.2,
-                                        fontSize: "0.75rem",
-                                        fontWeight: "bold"
-                                    }}>
-                                        אדמין
-                                    </Box>
-                                )}
-                                <Typography variant="subtitle1" fontWeight="bold">
-                                    {c.name}
-                                </Typography>
-                            </Box>
+
+                            <Typography
+                                variant="subtitle1"
+                                fontWeight="bold"
+                            >
+                                {c.name}
+                            </Typography>
                         </Box>
+
                         <Typography sx={{ mt: 1 }}>
                             {c.comment}
                         </Typography>
+
+                        {/* תגובות מנהל */}
+                        {adminReplies.map((reply) => (
+                            <Box
+                                key={reply.id}
+                                sx={{
+                                    mt: 2,
+                                    ml: 4,
+                                    p: 2,
+                                    borderRadius: 2,
+                                    backgroundColor: "#fff3e0",
+                                    border: "1px solid #ffcc80",
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                    >
+                                        {new Date(reply.created_at).toLocaleString("he-IL")}
+                                    </Typography>
+
+                                    <Box
+                                        sx={{
+                                            backgroundColor: "#e65100",
+                                            color: "white",
+                                            px: 1,
+                                            py: 0.3,
+                                            borderRadius: 1,
+                                            fontSize: "0.75rem",
+                                            fontWeight: "bold",
+                                        }}
+                                    >
+                                        {reply.name} | מנהל
+                                    </Box>
+                                </Box>
+
+                                <Typography sx={{ mt: 1 }}>
+                                    {reply.comment}
+                                </Typography>
+                            </Box>
+                        ))}
                     </Box>
-                ))
-            }
+                );
+            })}
 
-            {/* טופס להוספת תגובה */}
-            <Box sx={{ mt: 4 }}>
-                <Typography variant="h6" align="right">
-                    הוסף תגובה משלך
-                </Typography>
-                {!isAdmin && (
-                    <>
-                        <TextField
-                            label={
-                                <span>
-                                    <span style={{ color: "red" }}>*</span>שם
-                                </span>
-                            }
-                            fullWidth
-                            sx={{ mt: 2 }}
-                            dir="rtl"
-                            InputProps={{ style: { textAlign: "right" } }}
-                            value={name}
-                            onChange={(e) => {
-                                const value = e.target.value;
-                                setName(value);
+            {/* כפתור פתיחת טופס */}
+            <Box sx={{ mt: 5, textAlign: "center" }}>
+                <Button
+                    variant="contained"
+                    onClick={() => setShowForm((prev) => !prev)}
+                >
+                    {showForm
+                        ? "סגור טופס תגובה"
+                        : "הוספת תגובה משלך"}
+                </Button>
+            </Box>
 
-                                // בדיקה דינמית של השם – חייב להיות לא ריק
-                                setErrors((prev) => ({ ...prev, name: !value.trim() }));
-                            }}
-                            error={errors.name}
-                            helperText={errors.name ? "אנא הזן שם" : ""}
-                        />
-                        <TextField
-                            label={
-                                <span>
-                                    <span style={{ color: "red" }}>*</span>מייל
-                                </span>
-                            }
-                            fullWidth
-                            sx={{ mt: 2 }}
-                            dir="rtl"
-                            InputProps={{ style: { textAlign: "right" } }}
-                            value={email}
-                            onChange={(e) => {
-                                const value = e.target.value;
-                                setEmail(value);
+            {/* טופס */}
+            <Collapse in={showForm}>
+                <Box sx={{ mt: 4 }}>
 
-                                // בדיקה מלאה של המייל
-                                const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-                                const isValid = emailRegex.test(value.trim());
+                    {!isAdmin && !session && (
+                        <>
+                            <TextField
+                                label="שם *"
+                                fullWidth
+                                sx={{ mt: 2 }}
+                                dir="rtl"
+                                value={name}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setName(value);
 
-                                // עדכון שגיאה דינמית בזמן אמת
-                                setErrors((prev) => ({ ...prev, email: !isValid }));
-                            }}
-                            error={errors.email}
-                            helperText={errors.email ? "אנא הזן כתובת מייל תקינה" : ""}
-                        />
-                    </>
-                )}
+                                    setErrors((prev) => ({
+                                        ...prev,
+                                        name: !value.trim(),
+                                    }));
+                                }}
+                                error={errors.name}
+                                helperText={errors.name ? "אנא הזן שם" : ""}
+                            />
 
-                <Autocomplete
-                    options={subjectOptions}
-                    getOptionLabel={(option) => option.label}
-                    value={subjectOptions.find((opt) => opt.value === subjectType) || null}
-                    inputValue={subjectInput}
-                    onInputChange={(event, newInputValue) => setSubjectInput(newInputValue)}
-                    onChange={(event, newValue) => {
-                        const value = newValue ? newValue.value : null;
-                        setSubjectType(value);
-                        if (errors.subjectType) setErrors(prev => ({ ...prev, subjectType: false }));
-                    }}
+                            <TextField
+                                label="מייל *"
+                                fullWidth
+                                sx={{ mt: 2 }}
+                                dir="rtl"
+                                value={email}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setEmail(value);
 
-                    renderInput={(params) => (
+                                    const emailRegex =
+                                        /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-                        <TextField
-                            {...params}
-                            label={
-                                <span>
-                                    <span style={{ color: "red" }}>*</span>סוג הנושא
-                                </span>
-                            }
-                            fullWidth
-                            sx={{ mt: 2 }}
-                            dir="rtl"
-                            InputProps={{ ...params.InputProps, style: { textAlign: "right" } }}
-                            error={errors.subjectType}
-                            helperText={errors.subjectType ? "אנא בחר סוג נושא" : ""}
-                        />
+                                    setErrors((prev) => ({
+                                        ...prev,
+                                        email: !emailRegex.test(value.trim()),
+                                    }));
+                                }}
+                                error={errors.email}
+                                helperText={
+                                    errors.email
+                                        ? "אנא הזן כתובת מייל תקינה"
+                                        : ""
+                                }
+                            />
+                        </>
                     )}
-                />
-                {subjectType === "story" && (
+
                     <Autocomplete
-                        options={stories.map((s) => ({ label: s.title, id: s.id }))}
-                        getOptionLabel={(option) => typeof option === "string" ? option : option.label}
-                        value={selectedStory}
-                        inputValue={inputValue}
-                        onInputChange={(e, newInputValue) => setInputValue(newInputValue)}
-                        onChange={(e, newValue) => {
-                            setSelectedStory(newValue)
-                            if (errors.selectedStory) setErrors(prev => ({ ...prev, selectedStory: false }));
+                        options={subjectOptions}
+                        getOptionLabel={(option) => option.label}
+                        value={
+                            subjectOptions.find(
+                                (opt) => opt.value === subjectType
+                            ) || null
+                        }
+                        inputValue={subjectInput}
+                        onInputChange={(e, value) => setSubjectInput(value)}
+                        onChange={(e, value) => {
+                            setSubjectType(value ? value.value : null);
                         }}
                         renderInput={(params) => (
                             <TextField
                                 {...params}
-                                label={
-                                    <span>
-                                        <span style={{ color: "red" }}>*</span>בחר סיפור
-                                    </span>
-                                }
-                                fullWidth sx={{ mt: 2 }}
-                                dir="rtl"
-                                InputProps={{ ...params.InputProps, style: { textAlign: "right" } }}
-                                error={errors.selectedStory}
-                                helperText={errors.selectedStory ? "אנא בחר סיפור" : ""}
+                                label="סוג נושא *"
+                                sx={{ mt: 2 }}
                             />
                         )}
                     />
-                )}
 
-                {subjectType === "other" && (
+                    {subjectType === "story" && (
+                        <Autocomplete
+                            options={stories.map((s) => ({
+                                label: s.title,
+                                id: s.id
+                            }))}
+                            getOptionLabel={(option) =>
+                                typeof option === "string"
+                                    ? option
+                                    : option.label
+                            }
+                            value={selectedStory}
+                            inputValue={inputValue}
+                            onInputChange={(e, value) => setInputValue(value)}
+                            onChange={(e, value) => setSelectedStory(value)}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="בחר סיפור *"
+                                    sx={{ mt: 2 }}
+                                />
+                            )}
+                        />
+                    )}
+
+                    {subjectType === "other" && (
+                        <TextField
+                            label="נושא מותאם *"
+                            value={customSubject}
+                            onChange={(e) =>
+                                setCustomSubject(e.target.value)
+                            }
+                            fullWidth
+                            sx={{ mt: 2 }}
+                        />
+                    )}
+
                     <TextField
-                        label={
-                            <span>
-                                נושא מותאם<span style={{ color: "red" }}>*</span>
-                            </span>
-                        } value={customSubject}
-                        onChange={(e) => {
-                            setCustomSubject(e.target.value);
-                            if (errors.customSubject) setErrors(prev => ({ ...prev, customSubject: false }));
-                        }}
+                        label="תוכן התגובה *"
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        multiline
+                        rows={4}
                         fullWidth
                         sx={{ mt: 2 }}
-                        dir="rtl"
-                        InputProps={{ style: { textAlign: "right" } }}
-                        error={errors.customSubject}
-                        helperText={errors.customSubject ? "אנא הזן נושא מותאם" : ""}
                     />
-                )}
-                {/* תוכן התגובה */}
-                <TextField
-                    label={
-                        <span>
-                            תוכן התגובה
-                            <span style={{ color: "red" }}>*</span>
-                        </span>
-                    } value={text}
-                    onChange={(e) => {
-                        setText(e.target.value)
-                        if (errors.text)
-                            setErrors(prev => ({ ...prev, text: false }));
-                    }}
-                    multiline
-                    rows={4}
-                    fullWidth
-                    sx={{ mt: 2 }}
-                    dir="rtl"
-                    InputProps={{ style: { textAlign: "right" } }}
-                    error={errors.text}
-                    helperText={errors.text ? "אנא הזן תוכן תגובה" : ""}
-                />
-                {successMessage && (
-                    <Typography variant="body1" color="success.main" align="center" sx={{ mt: 2 }}>
-                        {successMessage}
-                    </Typography>
-                )}
-                {/* כפתור שליחה */}
-                <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
-                    <Button variant="contained" color="primary" onClick={handleSubmit}>
-                        שלח תגובה
-                    </Button>
+
+                    {successMessage && (
+                        <Typography
+                            variant="body1"
+                            color="success.main"
+                            align="center"
+                            sx={{ mt: 2 }}
+                        >
+                            {successMessage}
+                        </Typography>
+                    )}
+
+                    <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            mt: 2
+                        }}
+                    >
+                        <Button
+                            variant="contained"
+                            onClick={handleSubmit}
+                        >
+                            שלח תגובה
+                        </Button>
+                    </Box>
                 </Box>
-            </Box>
-        </Container >
+            </Collapse>
+        </Container>
     );
 };
 
