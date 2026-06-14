@@ -1,52 +1,38 @@
-import { Box, Button, Container, TextField, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Divider, IconButton, TextField, Tooltip, Typography, useMediaQuery, useTheme } from '@mui/material';
 import mammoth from "mammoth";
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useComments } from '../context/CommentsContext';
 import stories from './Stories';
 import DownloadIcon from '@mui/icons-material/Download';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
-const StoryPage = () => {
+const StoryPage = ({ session, isAdmin }) => {
   const { id } = useParams();
   const story = stories.find(s => s.id === parseInt(id, 10));
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const { addComment } = useComments();
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    comment: ""
-  });
-  const [errors, setErrors] = useState({
-    name: false,
-    email: false,
-    comment: false
-  });
+  const [form, setForm] = useState({ name: "", email: "", comment: "" });
+  const [errors, setErrors] = useState({ name: false, email: false, comment: false });
   const [successMessage, setSuccessMessage] = useState("");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [scrollProgress, setScrollProgress] = useState(0);
 
   const contentRef = useRef(null);
-  const leftRef = useRef(null);
-  const rightRef = useRef(null);
-  const isSyncing = useRef(false);
-  const [scrollHeight, setScrollHeight] = useState(0);
+  const progressBarRef = useRef(null);
 
-  // ============================
-  // Effects
-  // ============================
+  // remove the full-page vertical scrollbar
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = "auto"; };
+    return () => { document.body.style.overflow = ""; };
   }, []);
 
   useEffect(() => {
-    if (contentRef.current) { setScrollHeight(contentRef.current.scrollHeight); }
-  }, [content, loading]);
-
-  useEffect(() => {
     if (!story?.docx) return;
-
     fetch(story.docx)
       .then(res => res.arrayBuffer())
       .then(buffer => mammoth.extractRawText({ arrayBuffer: buffer }))
@@ -58,65 +44,49 @@ const StoryPage = () => {
         setError(null);
         setLoading(false);
       })
-      .catch(err => {
-        setError(err.message);
-        setLoading(false);
-      });
+      .catch(err => { setError(err.message); setLoading(false); });
   }, [story]);
 
-  // ============================
-  // פונקציות
-  // ============================
+  const handleScroll = () => {
+    const el = contentRef.current;
+    if (!el) return;
+    const progress = el.scrollTop / (el.scrollHeight - el.clientHeight);
+    setScrollProgress(Math.min(100, Math.round(progress * 100)));
+  };
+
+  const handleProgressBarClick = (e) => {
+    const bar = progressBarRef.current;
+    const el = contentRef.current;
+    if (!bar || !el) return;
+    const rect = bar.getBoundingClientRect();
+    // direction: ltr on the bar, right side = start of story (0%), left side = end (100%)
+    const clickX = e.clientX - rect.left;
+    const fraction = 1 - (clickX / rect.width);
+    const target = fraction * (el.scrollHeight - el.clientHeight);
+    el.scrollTo({ top: target, behavior: "smooth" });
+  };
+
   const handleInputChange = (field) => (e) => {
     setForm(prev => ({ ...prev, [field]: e.target.value }));
     setErrors(prev => ({ ...prev, [field]: false }));
   };
 
   const handleSubmit = async () => {
-    let tempErrors = { ...errors };
-    let hasError = false;
-
-    if (!form.name.trim()) {
-      tempErrors.name = true;
-      hasError = true;
-    }
+    const isLoggedIn = !!session;
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!form.email.trim() || !emailRegex.test(form.email.trim())) {
-      tempErrors.email = true;
-      hasError = true;
-    }
-    if (!form.comment.trim()) {
-      tempErrors.comment = true;
-      hasError = true;
-    }
+    const newErrors = {
+      name: !isLoggedIn && !isAdmin ? !form.name.trim() : false,
+      email: !isLoggedIn && !isAdmin ? (!form.email.trim() || !emailRegex.test(form.email.trim())) : false,
+      comment: !form.comment.trim(),
+    };
+    setErrors(newErrors);
+    if (Object.values(newErrors).some(Boolean)) return;
 
-    if (hasError) {
-      setErrors(tempErrors);
-      return;
-    }
-
-    await addComment(form.name, story.id, story.title, form.comment, form.email);
-
-    // איפוס השדות לאחר שליחה
+    await addComment(form.name, story.id, story.title, form.comment, form.email, false, null, session?.user?.id || null);
     setForm({ name: "", email: "", comment: "" });
     setErrors({ name: false, email: false, comment: false });
-
-    setSuccessMessage("!!!התגובה שלך נחתה בבטחה במערכת! תודה רבה")
+    setSuccessMessage("התגובה שלך נשלחה וממתינה לאישור!");
     setTimeout(() => setSuccessMessage(""), 3000);
-  };
-
-  const syncScroll = (sourceRef, targetRefs) => {
-    if (!sourceRef.current || isSyncing.current) return;
-    isSyncing.current = true;
-
-    const scrollTop = sourceRef.current.scrollTop;
-    targetRefs.forEach(ref => {
-      if (ref.current) ref.current.scrollTop = scrollTop;
-    });
-
-    requestAnimationFrame(() => {
-      isSyncing.current = false;
-    });
   };
 
   const handleDownloadPDF = () => {
@@ -126,220 +96,215 @@ const StoryPage = () => {
       link.download = story.title + ".pdf";
       link.click();
     }
-  }
+  };
 
   const isAllowedLine = (line) => {
     const noSpace = line.replace(/\s/g, '');
     if (noSpace === '') return true;
     return /^[\u05D0-\u05EA\u05F3\u05F4!?"'.,()-]+$/u.test(noSpace);
-  }
+  };
 
-  if (!story) {
-    return (
-      <Container sx={{ textAlign: 'center' }}>
-        <Typography variant="h5">סיפור לא נמצא</Typography>
-        <Button component={Link} to="/" variant="contained" sx={{ mt: 2 }}>
-          חזור לדף הבית
-        </Button>
-      </Container>
-    );
-  }
+  if (!story) return (
+    <Box sx={{ textAlign: 'center', mt: 10 }}>
+      <Typography variant="h5">סיפור לא נמצא</Typography>
+      <Button component={Link} to="/" variant="contained" sx={{ mt: 2 }}>חזור לדף הבית</Button>
+    </Box>
+  );
 
-  // ============================
-  // תצוגת הרכיב
-  // ============================
   return (
-    <Container
-      sx={{
-        p: 2,
-        maxWidth: 'lg',
-        height: "calc(100vh - 64px)",
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: "hidden",
-        pt: "70px",
-      }}
-    >
+    <Box sx={{ height: "100vh", display: "flex", flexDirection: "column", pt: "64px", bgcolor: "#f8f9fa" }}>
+
+      {/* כותרת */}
+      <Box sx={{
+        px: { xs: 2, md: 4 }, py: 1.5,
+        bgcolor: "white",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <Tooltip title="הורד PDF">
+          <IconButton onClick={handleDownloadPDF} size="small" color="primary">
+            <DownloadIcon />
+          </IconButton>
+        </Tooltip>
+
+        <Typography variant="h6" fontWeight="bold" sx={{ flex: 1, textAlign: "center" }}>
+          {story.title}
+        </Typography>
+
+        <Tooltip title="חזור לדף הבית">
+          <IconButton component={Link} to="/" size="small">
+            <ArrowForwardIcon />
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      {/* progress bar — removed from here, now lives inside the story column */}
+
+      {loading && (
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 6 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {!loading && error && (
+        <Box sx={{ textAlign: "center", mt: 4 }}>
+          <Typography color="error">שגיאה בטעינת הסיפור</Typography>
+        </Box>
+      )}
+
       {!loading && !error && (
-        <Box sx={{ display: 'flex', gap: 2, flex: 1, minHeight: 0 }}>
-          {/* גולל שמאלי */}
-          <Box
-            ref={leftRef}
-            sx={{
-              width: "20px",
-              overflowY: "auto",
-              height: "100%",
-              cursor: "pointer",
-            }}
-            onScroll={() => syncScroll(leftRef, [contentRef, rightRef])}
-          >
-            <Box sx={{ height: scrollHeight }} />
+        <Box sx={{
+          flex: 1,
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          gap: 0,
+          overflow: "hidden",
+        }}>
+
+          {/* טופס תגובה */}
+          <Box sx={{
+            width: isMobile ? "100%" : 320,
+            flexShrink: 0,
+            height: isMobile ? "auto" : "100%",
+            overflowY: isMobile ? "visible" : "auto",
+            px: 3,
+            py: 3,
+            bgcolor: "white",
+            boxShadow: isMobile ? "0 -2px 8px rgba(0,0,0,0.06)" : "none",
+            "&::-webkit-scrollbar": { width: 4 },
+            "&::-webkit-scrollbar-thumb": { bgcolor: "#ddd", borderRadius: 2 },
+          }} dir="rtl">
+            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+              תגובה על הסיפור
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+
+            {!session && !isAdmin && (
+              <>
+                <TextField
+                  label="שם *" fullWidth size="small" sx={{ mb: 2 }}
+                  value={form.name}
+                  onChange={handleInputChange("name")}
+                  error={errors.name}
+                  helperText={errors.name ? "אנא הזן שם" : ""}
+                />
+                <TextField
+                  label="מייל *" fullWidth size="small" sx={{ mb: 2 }}
+                  value={form.email}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm(prev => ({ ...prev, email: v }));
+                    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                    setErrors(prev => ({ ...prev, email: !emailRegex.test(v.trim()) }));
+                  }}
+                  error={errors.email}
+                  helperText={errors.email ? "אנא הזן כתובת מייל תקינה" : ""}
+                />
+              </>
+            )}
+
+            <TextField
+              label="תוכן התגובה *" multiline rows={isMobile ? 3 : 5} fullWidth size="small" sx={{ mb: 2 }}
+              value={form.comment}
+              onChange={handleInputChange("comment")}
+              error={errors.comment}
+              helperText={errors.comment ? "אנא הזן תוכן תגובה" : ""}
+            />
+
+            {successMessage && (
+              <Typography color="success.main" variant="body2" sx={{ mb: 1, textAlign: "center" }}>
+                {successMessage}
+              </Typography>
+            )}
+
+            <Button variant="contained" fullWidth onClick={handleSubmit}>
+              שלח תגובה
+            </Button>
           </Box>
 
-          {/* טקסט מרכזי */}
-          <Box
-            ref={contentRef}
-            sx={{
-              flex: 1,
-              p: 2,
-              mt: 2,
-              height: "100%",
-              overflowY: "auto",
-              position: "relative",
-              "&::-webkit-scrollbar": { width: "10px" },
-            }}
-            onScroll={() => syncScroll(contentRef, [leftRef, rightRef])}
-          >
-            {content.split("\n").map((line, idx) => {
-              const trimmed = line.trim();
+          {/* מפריד אנכי (desktop בלבד) */}
+          {!isMobile && <Divider orientation="vertical" flexItem />}
 
-              if (trimmed === "") {
-                return <Box key={idx} sx={{ height: "0.6em" }} />;
-              }
-              if (isAllowedLine(line)) {
-                return (
-                  <Typography
-                    key={idx}
-                    variant='body1'
-                    align='right'
-                    sx={{
-                      fontSize: "1rem",
-                      lineHeight: 1.9,
+          {/* טקסט הסיפור */}
+          <Box sx={{
+            flex: isMobile ? "none" : 1,
+            height: isMobile ? "55vh" : "100%",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}>
+            {/* progress bar — scoped to story column, clickable, RTL */}
+            <Box
+              ref={progressBarRef}
+              onClick={handleProgressBarClick}
+              style={{
+                height: 4,
+                backgroundColor: "#e0e0e0",
+                position: "relative",
+                cursor: "pointer",
+                flexShrink: 0,
+                direction: "ltr",
+              }}
+            >
+              <Box
+                style={{
+                  height: "100%",
+                  width: "100%",
+                  backgroundColor: "#1976d2",
+                  transition: "transform 0.15s",
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  left: "auto",
+                  transformOrigin: "100% 50%",
+                  transform: `scaleX(${scrollProgress / 100})`,
+                }}
+              />
+            </Box>
+
+            <Box
+              ref={contentRef}
+              onScroll={handleScroll}
+              sx={{
+                flex: 1,
+                overflowY: "auto",
+                px: { xs: 2.5, md: 6 },
+                py: 4,
+                "&::-webkit-scrollbar": { display: "none" },
+                scrollbarWidth: "none",
+              }}
+            >
+              {content.split("\n").map((line, idx) => {
+                const trimmed = line.trim();
+                if (trimmed === "") return <Box key={idx} sx={{ height: "0.6em" }} />;
+                if (isAllowedLine(line)) {
+                  return (
+                    <Typography key={idx} variant="body1" align="right" sx={{
+                      fontSize: { xs: "1rem", md: "1.05rem" },
+                      lineHeight: 2,
                       direction: "rtl",
                       whiteSpace: "pre-wrap",
                       unicodeBidi: "plaintext",
-                      mb: 0.5,
-                    }}
-                  >
-                    {line}
-                  </Typography>
-                );
-              }
-              else {
+                      mb: 0.3,
+                      color: "#222",
+                    }}>
+                      {line}
+                    </Typography>
+                  );
+                }
                 return (
                   <Box key={idx} sx={{ textAlign: "center", my: 2 }}>
-                    <Typography
-                      variant='body1'
-                      sx={{
-                        fontSize: "1rem",
-                        lineHeight: 1.9,
-                        whiteSpace: "pre-wrap",
-                      }}
-                    >
+                    <Typography variant="body1" sx={{ fontSize: "1rem", lineHeight: 1.9, whiteSpace: "pre-wrap" }}>
                       {line}
                     </Typography>
                   </Box>
                 );
-              }
-            })}
-          </Box>
-
-          {/* גולל ימני */}
-          <Box
-            ref={rightRef}
-            sx={{
-              width: "20px",
-              overflowY: "auto",
-              height: "100%",
-              cursor: "pointer"
-            }}
-            onScroll={() => syncScroll(rightRef, [contentRef, leftRef])}
-          >
-            <Box sx={{ height: scrollHeight }} />
-          </Box>
-
-          {/* טופס הוספת תגובה */}
-          <Box sx={{ mt: 4 }}>
-            <Typography variant="h6" align="right">
-              תנו את תגובתכם על הסיפור
-            </Typography>
-            <TextField
-              label={
-                <span>
-                  שם<span style={{ color: "red" }}>*</span>
-                </span>
-              }
-              value={form.name}
-              onChange={handleInputChange("name")}
-              fullWidth
-              sx={{ mt: 2 }}
-              InputProps={{ style: { textAlign: "right" } }}
-              error={errors.name}
-              helperText={errors.name ? "אנא הזן שם" : ""}
-            />
-            <TextField
-              label={
-                <span>
-                  <span style={{ color: "red" }}>*</span>מייל
-                </span>
-              }
-              value={form.email}
-              // onChange={handleInputChange("email")}
-              fullWidth
-              dir="rtl"
-              sx={{ mt: 2 }}
-              InputProps={{ style: { textAlign: "right" } }}
-              onChange={(e) => {
-                const value = e.target.value;
-                setForm((prev) => ({ ...prev, email: value }));
-
-                // בדיקת תקינות בזמן אמת
-                const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-                const isValid = emailRegex.test(value.trim());
-
-                // עדכון השגיאה דינמית כמו ב־CommentPage
-                setErrors((prev) => ({ ...prev, email: !isValid }));
-              }}
-              error={errors.email}
-              helperText={errors.email ? "אנא הזן כתובת מייל תקינה" : ""}
-            />
-            <TextField
-              label={
-                <span>
-                  תוכן התגובה<span style={{ color: "red" }}>*</span>
-                </span>
-              }
-              value={form.comment}
-              onChange={handleInputChange("comment")}
-              multiline
-              rows={4}
-              fullWidth
-              sx={{ mt: 2 }}
-              InputProps={{ style: { textAlign: "right" } }}
-              error={errors.comment}
-              helperText={errors.comment ? "אנא הזן תוכן תגובה" : ""}
-            />
-            {successMessage && (
-              <Typography color="success.main" sx={{ mt: 2, mb: 1 }}>
-                {successMessage}
-              </Typography>
-            )}
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-              <Button variant="contained" color="primary" onClick={handleSubmit}>
-                שלח תגובה
-              </Button>
+              })}
             </Box>
           </Box>
         </Box>
-      )
-      }
-      {
-        !loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 3 }}>
-            <Button
-              variant='contained'
-              color='secondary'
-              startIcon={< DownloadIcon />}
-              onClick={handleDownloadPDF}
-            >
-            </Button>
-            <Button component={Link} to="/" variant="contained">
-              חזור לדף הבית
-            </Button>
-          </Box>
-        )
-      }
-    </Container >
+      )}
+    </Box>
   );
 };
 

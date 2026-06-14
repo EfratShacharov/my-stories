@@ -108,6 +108,7 @@ function App() {
                   element={
                     <StoryPage
                       session={session}
+                      isAdmin={isAdmin}
                       onAuthClick={() => setAuthOpen(true)}
                     />
                   }
