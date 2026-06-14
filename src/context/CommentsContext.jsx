@@ -6,18 +6,35 @@ const CommentsContext = createContext();
 export const CommentsProvider = ({ children }) => {
     const [comments, setComments] = useState([]);
 
-    // טעינה ראשונית
+    const fetchComments = async () => {
+        const { data, error } = await supabase
+            .from("comments")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+        if (!error) setComments(data);
+    };
+
     useEffect(() => {
-        const fetchComments = async () => {
-            const { data, error } = await supabase
-                .from("comments")
-                .select("*")
-                .order("created_at", { ascending: false });
-
-            if (!error) setComments(data);
-        };
-
         fetchComments();
+
+        const subscription = supabase
+            .channel("comments-changes")
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "comments"
+                },
+                (payload) => {
+                    console.log("Realtime event:", payload);
+                    fetchComments();
+                }
+            )
+            .subscribe();
+
+        return () => supabase.removeChannel(subscription);
     }, []);
 
     const addComment = async (name, storyId, subject, text, email, isAdmin = false, parentId = null, userId = null) => {
@@ -62,7 +79,7 @@ export const CommentsProvider = ({ children }) => {
     };
 
     return (
-        <CommentsContext.Provider value={{ comments, addComment }}>
+        <CommentsContext.Provider value={{ comments, addComment, fetchComments }}>
             {children}
         </CommentsContext.Provider>
     );

@@ -13,8 +13,8 @@ my-stories/
 ├── src/
 │   ├── components/
 │   │   ├── Stories.jsx        # מערך סטטי של סיפורים (id, title, docx, pdf)
-│   │   ├── Home.jsx           # דף ראשי – רשימת סיפורים עם תקציר
-│   │   ├── StoryPage.jsx      # קריאת סיפור + טופס תגובה
+│   │   ├── Home.jsx           # דף ראשי – רשימת סיפורים עם תקציר אוטומטי מ-DOCX
+│   │   ├── StoryPage.jsx      # קריאת סיפור + טופס תגובה מהירה
 │   │   ├── CommentPage.jsx    # עמוד תגובות ציבוריות + טופס הגשה
 │   │   ├── CommentsManager.jsx# ניהול תגובות (מנהל בלבד)
 │   │   ├── FileManager.jsx    # ניהול קבצים (מנהל בלבד, localStorage)
@@ -26,7 +26,7 @@ my-stories/
 │   ├── supabase.js            # אתחול Supabase client
 │   ├── App.js                 # נתב ראשי + ניהול session
 │   └── index.js               # נקודת כניסה
-├── .env                       # משתני סביבה (Supabase URL, KEY, ADMIN_EMAIL)
+├── .env                       # משתני סביבה
 └── package.json
 ```
 
@@ -39,8 +39,9 @@ my-stories/
 | React | 19 | UI framework |
 | React Router DOM | 7 | ניווט בין עמודים |
 | MUI (Material UI) | 7 | רכיבי UI |
-| Emotion | 11 | CSS-in-JS (RTL support) |
-| stylis-plugin-rtl | 2 | תמיכה בכיוון RTL |
+| @mui/icons-material | 7 | אייקונים (CreateIcon, AutoStoriesIcon וכו') |
+| Emotion | 11 | CSS-in-JS |
+| stylis-plugin-rtl | 2 | תמיכה גלובלית בכיוון RTL |
 | Supabase JS | 2 | Backend: auth + database |
 | EmailJS | 3 | שליחת OTP במייל למנהל |
 | mammoth | 1 | המרת קבצי DOCX לטקסט |
@@ -55,16 +56,16 @@ my-stories/
 
 | פעולה | מתבצע ב | תיאור |
 |---|---|---|
-| `select * order by created_at desc` | CommentsContext, CommentsManager | טעינת כל התגובות |
+| `select * order by created_at desc` | CommentsContext.fetchComments | טעינת כל התגובות |
 | `insert` | CommentsContext.addComment | הוספת תגובה חדשה |
 | `update { status }` | CommentsManager.updateStatus | אישור / דחיית תגובה |
-| `insert` (is_admin: true) | CommentsManager.sendReply | תגובת מנהל |
+| `insert` (is_admin: true, status: approved) | CommentsManager.sendReply | תגובת מנהל |
 
 **מבנה רשומת comment:**
 ```js
 {
   id, name, email,
-  story_id,       // null אם לא סיפור
+  story_id,       // null אם לא סיפור ספציפי
   story_title,    // נושא חופשי או שם סיפור
   comment,
   is_admin,       // boolean
@@ -74,11 +75,18 @@ my-stories/
 }
 ```
 
+**Supabase RLS policies על `comments`:**
+- `SELECT` – משתמשים רגילים רואים רק `status = 'approved'`; מנהל רואה הכל
+- `INSERT` – מותר ל-`anon` ו-`authenticated` (WITH CHECK: true)
+- `UPDATE` – מותר ל-`authenticated` בלבד
+
 ### טבלת `users`
 
 | פעולה | מתבצע ב | תיאור |
 |---|---|---|
-| `select name, is_admin` | App.js.loadUserData | קריאת פרטי משתמש |
+| `select name, is_admin` | App.js.loadUserData | קריאת פרטי משתמש לאחר login |
+| `select name, email` | CommentsContext.addComment | שליפת פרטי משתמש מחובר |
+| `select name` | CommentsManager (useEffect) | שליפת שם המנהל המחובר |
 | `insert` | AuthModal.handleRegister | יצירת משתמש חדש |
 
 **מבנה רשומת user:**
@@ -104,7 +112,7 @@ my-stories/
 
 ```
 App.js
-├── CommentsProvider (Context)
+├── CommentsProvider (Context – comments, addComment, fetchComments)
 ├── Navbar (isAdmin, session, userName)
 └── Routes
     ├── /                → Home
@@ -117,7 +125,9 @@ App.js
 ### ניהול מצב
 
 - **session / isAdmin / userName** – מנוהל ב-`App.js`, מועבר כ-props
-- **comments** – מנוהל ב-`CommentsContext` (Context API), נטען פעם אחת בהתחלה
+- **comments** – מנוהל ב-`CommentsContext`:
+  - נטען פעם אחת עם `fetchComments` ב-useEffect
+  - `fetchComments` חשופה ב-Context ומופעלת אחרי כל שינוי (אישור, דחייה, תגובת מנהל) לעדכון מיידי
 - **RTL** – מוגדר גלובלית דרך MUI ThemeProvider + stylis-plugin-rtl
 
 ### זרימת אימות
@@ -129,15 +139,33 @@ App.js
 
 ### הרשאות
 
-- **אורח** – קריאת סיפורים, הגשת תגובה (עם שם + מייל ידני)
-- **משתמש מחובר** – הגשת תגובה (שם ומייל נלקחים מה-DB אוטומטית)
-- **מנהל** – כל האמור + ניהול תגובות (אישור/דחייה/תשובה) + ניהול קבצים
+| משתמש | יכולות |
+|---|---|
+| אורח | קריאת סיפורים, הגשת תגובה עם שם + מייל ידני |
+| משתמש מחובר | הגשת תגובה (שם ומייל נלקחים מה-DB אוטומטית) |
+| מנהל | הכל + אישור/דחייה/תשובה לתגובות + ניהול קבצים |
 
 ### ניהול תגובות
 
 - תגובות חדשות נכנסות בסטטוס `pending`
 - תגובות מנהל נכנסות ישירות בסטטוס `approved`
-- בתצוגה ציבורית מוצגות רק תגובות `approved` עם `parent_id = null` + תגובות המנהל שלהן
+- בתצוגה ציבורית (`CommentPage`) מוצגות רק תגובות `approved` עם `parent_id = null` + תגובות המנהל שלהן
+- בדף הניהול (`CommentsManager`) מוצגות **כל** התגובות עם סטטוס + אפשרויות פעולה
+- לאחר כל פעולת מנהל נקרא `fetchComments` לעדכון מיידי בכל הדפים
+
+### עיצוב תגובות
+
+**CommentPage (ציבורי):**
+- אווטאר `CreateIcon` (כחול) למשתמש, `AutoStoriesIcon` (כתום) למנהל
+- שם + תאריך בפורמט `DD.MM.YYYY, HH:MM`
+- נושא מתחת לשם
+- תגובות מנהל עם badge כתום ו-`| מנהלת`
+
+**CommentsManager (מנהל):**
+- כרטיסי MUI עם סטטוס Chip (ירוק/אדום/כתום)
+- תצוגה: סטטוס → שם + תאריך → מייל → נושא → תוכן
+- פורמט תאריך: `(HH:MM ,DD.MM.YYYY)`
+- כפתורי אשר / דחה / השב לכל תגובה
 
 ---
 
@@ -147,4 +175,5 @@ App.js
 REACT_APP_SUPABASE_URL=
 REACT_APP_SUPABASE_ANON_KEY=
 REACT_APP_ADMIN_EMAIL=
+REACT_APP_ADMIN_PASSWORD=
 ```
