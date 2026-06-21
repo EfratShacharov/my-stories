@@ -3,13 +3,25 @@ import mammoth from "mammoth";
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useComments } from '../context/CommentsContext';
-import stories from './Stories';
 import DownloadIcon from '@mui/icons-material/Download';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import { supabase } from '../supabase';
 
 const StoryPage = ({ session, isAdmin }) => {
   const { id } = useParams();
-  const story = stories.find(s => s.id === parseInt(id, 10));
+  const [story, setStory] = useState(null);
+
+  useEffect(() => {
+    async function loadStory() {
+      const { data, error } = await supabase
+        .from("stories")
+        .select("id, title, docx_url, pdf_url")
+        .eq("id", parseInt(id, 10))
+        .single();
+      if (!error && data) setStory(data);
+    }
+    loadStory();
+  }, [id]);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -32,8 +44,8 @@ const StoryPage = ({ session, isAdmin }) => {
   }, []);
 
   useEffect(() => {
-    if (!story?.docx) return;
-    fetch(story.docx)
+    if (!story?.docx_url) return;
+    fetch(story.docx_url)
       .then(res => res.arrayBuffer())
       .then(buffer => mammoth.extractRawText({ arrayBuffer: buffer }))
       .then(result => {
@@ -89,19 +101,23 @@ const StoryPage = ({ session, isAdmin }) => {
     setTimeout(() => setSuccessMessage(""), 3000);
   };
 
-  const handleDownloadPDF = () => {
-    if (story?.pdf) {
+  const handleDownloadPDF = async () => {
+    if (story?.pdf_url) {
+      const response = await fetch(story.pdf_url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = story.pdf;
+      link.href = url;
       link.download = story.title + ".pdf";
       link.click();
+      window.URL.revokeObjectURL(url);
     }
   };
 
   const isAllowedLine = (line) => {
     const noSpace = line.replace(/\s/g, '');
     if (noSpace === '') return true;
-    return /^[\u05D0-\u05EA\u05F3\u05F4!?"'.,()-]+$/u.test(noSpace);
+    return /^[\u05D0-\u05EA\u05F3\u05F40-9!?"'.,()-]+$/u.test(noSpace);
   };
 
   if (!story) return (
@@ -228,7 +244,8 @@ const StoryPage = ({ session, isAdmin }) => {
           {/* טקסט הסיפור */}
           <Box sx={{
             flex: isMobile ? "none" : 1,
-            height: isMobile ? "55vh" : "100%",
+            height: isMobile ? "calc(55vh - 16px)" : "100%",
+            pb: isMobile ? 4 : 0,
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",

@@ -2,7 +2,7 @@ import { Button, Card, CardContent, Container, Typography } from '@mui/material'
 import * as mammoth from 'mammoth';
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import stories from './Stories';
+import { supabase } from '../supabase';
 
 async function extractTextFromDocx(url, maxLines = 5, wordsPerLine = 17) {
     const response = await fetch(url);
@@ -15,18 +15,14 @@ async function extractTextFromDocx(url, maxLines = 5, wordsPerLine = 17) {
     let indexOfMarker = -1;
     const regex = /תש.\\"?/;
     for (let i = 0; i < words.length; i++) {
-        if (regex.test(words[i])) {
-            indexOfMarker = i;
-            break;
-        }
+        if (regex.test(words[i])) { indexOfMarker = i; break; }
     }
     const filteredWords = indexOfMarker !== -1 ? words.slice(indexOfMarker + 1) : words;
 
     const lines = [];
     for (let i = 0; i < maxLines; i++) {
         const start = i * wordsPerLine;
-        const end = start + wordsPerLine;
-        const lineWords = filteredWords.slice(start, end);
+        const lineWords = filteredWords.slice(start, start + wordsPerLine);
         if (lineWords.length === 0) break;
         lines.push(lineWords.join(" "));
     }
@@ -35,26 +31,41 @@ async function extractTextFromDocx(url, maxLines = 5, wordsPerLine = 17) {
     let lastDotIndex = -1;
     for (let i = summaryText.length - 1; i >= 0; i--) {
         if (summaryText[i] === "." && (i === summaryText.length - 1 || summaryText[i + 1] === " ")) {
-            lastDotIndex = i;
-            break;
+            lastDotIndex = i; break;
         }
     }
-    if (lastDotIndex !== -1) {
-        summaryText = summaryText.slice(0, lastDotIndex + 1);
-    }
-
+    if (lastDotIndex !== -1) summaryText = summaryText.slice(0, lastDotIndex + 1);
     return summaryText;
 }
 
 const Home = () => {
+    const [stories, setStories] = useState([]);
     const [summaries, setSummaries] = useState({});
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        async function loadStories() {
+            const { data, error } = await supabase
+                .from("stories")
+                .select("id, title, docx_url, pdf_url")
+                .order("id");
+            if (error) {
+                console.error("שגיאה בטעינה:", error);
+            } else {
+                setStories(data || []);
+            }
+            setLoading(false);
+        }
+        loadStories();
+    }, []);
+
+    useEffect(() => {
+        if (stories.length === 0) return;
         async function loadSummaries() {
             const results = {};
             for (const story of stories) {
                 try {
-                    const text = await extractTextFromDocx(story.docx, 5, 17);
+                    const text = await extractTextFromDocx(story.docx_url, 5, 17);
                     results[story.id] = text;
                 } catch (e) {
                     results[story.id] = "תקציר לא זמין";
@@ -63,8 +74,9 @@ const Home = () => {
             setSummaries(results);
         }
         loadSummaries();
-    }, []);
+    }, [stories]);
 
+    if (loading) return null;
     return (
         <Container sx={{ p: 2 }}>
             <Typography variant="h4" style={{ marginBottom: 20, textAlign: 'right' }}>
@@ -95,13 +107,12 @@ const Home = () => {
                             component={Link}
                             to={`/story/${story.id}`}
                         >
-                        קרא עוד
-                    </Button>
-                </CardContent>
+                            קרא עוד
+                        </Button>
+                    </CardContent>
                 </Card>
-    ))
-}
-        </Container >
+            ))}
+        </Container>
     );
 };
 
