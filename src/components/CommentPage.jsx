@@ -10,9 +10,9 @@ import {
 import CreateIcon from "@mui/icons-material/Create";
 import AutoStoriesIcon from "@mui/icons-material/AutoStories";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useComments } from "../context/CommentsContext";
-import stories from "./Stories";
+import { supabase } from "../supabase";
 
 const CommentPage = ({ isAdmin, session }) => {
     const { comments, addComment } = useComments();
@@ -29,7 +29,13 @@ const CommentPage = ({ isAdmin, session }) => {
     const [successMessage, setSuccessMessage] = useState("");
     const [expandedReplies, setExpandedReplies] = useState({});
     const [replyTo, setReplyTo] = useState(null);
+    const [storiesList, setStoriesList] = useState([]);
     const formRef = useRef(null);
+
+    useEffect(() => {
+        supabase.from("stories").select("id, title").order("id")
+            .then(({ data }) => { if (data) setStoriesList(data); });
+    }, []);
 
     const toggleReplies = (id) =>
         setExpandedReplies((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -331,7 +337,7 @@ const CommentPage = ({ isAdmin, session }) => {
 
                         {subjectType === "story" && (
                             <Autocomplete
-                                options={stories.map((s) => ({ label: s.title, id: s.id }))}
+                                options={storiesList.map((s) => ({ label: s.title, id: s.id }))}
                                 getOptionLabel={(option) => typeof option === "string" ? option : option.label}
                                 value={selectedStory}
                                 inputValue={inputValue}
