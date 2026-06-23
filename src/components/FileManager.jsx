@@ -34,16 +34,32 @@ const FileManager = () => {
         setLoading(false);
     };
 
-    useEffect(() => { loadStories(); }, []);
+    useEffect(() => {
+        loadStories();
+        const channel = supabase
+            .channel("stories-changes")
+            .on("postgres_changes", { event: "*", schema: "public", table: "stories" }, loadStories)
+            .subscribe();
+        return () => supabase.removeChannel(channel);
+    }, []);
 
     const showMessage = (text, type = "success") => {
         setMessage({ text, type });
         setTimeout(() => setMessage({ text: "", type: "" }), 3000);
     };
 
-    const uploadFile = async (file, storyId, fileType) => {
-        const ext = fileType === "docx" ? "docx" : "pdf";
-        const fileName = `story_${storyId}.${ext}`;
+    const uploadFile = async (file) => {
+        const hebrewMap = {
+            'א':'a','ב':'b','ג':'g','ד':'d','ה':'h','ו':'v','ז':'z','ח':'ch','ט':'t',
+            'י':'y','כ':'k','ך':'k','ל':'l','מ':'m','ם':'m','נ':'n','ן':'n','ס':'s',
+            'ע':'a','פ':'p','ף':'f','צ':'tz','ץ':'tz','ק':'k','ר':'r','ש':'sh','ת':'t'
+        };
+        const nameParts = file.name.lastIndexOf(".");
+        const baseName = file.name.substring(0, nameParts)
+            .split("").map(c => hebrewMap[c] ?? c)
+            .join("").replace(/[^a-zA-Z0-9_\-]/g, "_").replace(/_+/g, "_");
+        const ext = file.name.substring(nameParts + 1);
+        const fileName = `${baseName}.${ext}`;
         const { error } = await supabase.storage
             .from("stories")
             .upload(fileName, file, { upsert: true });
@@ -71,39 +87,57 @@ const FileManager = () => {
     const handleSave = async () => {
         if (!form.title.trim()) return showMessage("חובה להזין שם סיפור", "error");
         setUploading(true);
+        const uploadedFiles = [];
         try {
-            let storyId = editStory?.id;
+            // העלאת קבצים תחילה
+            const updates = {};
+            if (docxFile) {
+                updates.docx_url = await uploadFile(docxFile);
+                uploadedFiles.push(getFileNameFromUrl(updates.docx_url));
+            }
+            if (pdfFile) {
+                updates.pdf_url = await uploadFile(pdfFile);
+                uploadedFiles.push(getFileNameFromUrl(updates.pdf_url));
+            }
 
+            // כתיבה ל-DB
             if (!editStory) {
                 const { data, error } = await supabase
                     .from("stories")
-                    .insert({ title: form.title })
+                    .insert({ title: form.title, ...updates })
                     .select()
                     .single();
                 if (error) throw error;
-                storyId = data.id;
             } else {
-                await supabase.from("stories").update({ title: form.title }).eq("id", storyId);
-            }
-
-            const updates = {};
-            if (docxFile) updates.docx_url = await uploadFile(docxFile, storyId, "docx");
-            if (pdfFile) updates.pdf_url = await uploadFile(pdfFile, storyId, "pdf");
-            if (Object.keys(updates).length > 0) {
-                await supabase.from("stories").update(updates).eq("id", storyId);
+                const { error } = await supabase
+                    .from("stories")
+                    .update({ title: form.title, ...updates })
+                    .eq("id", editStory.id);
+                if (error) throw error;
             }
 
             showMessage(editStory ? "הסיפור עודכן בהצלחה!" : "הסיפור נוסף בהצלחה!");
             setDialogOpen(false);
             loadStories();
         } catch (e) {
+            // rollback — מחיקת קבצים שהועלו אם ה-DB נכשל
+            if (uploadedFiles.length > 0)
+                await supabase.storage.from("stories").remove(uploadedFiles);
             showMessage("שגיאה: " + e.message, "error");
         }
         setUploading(false);
     };
 
+    const getFileNameFromUrl = (url) => url?.split("/").pop()?.split("?")[0];
+
     const handleDeleteConfirm = async () => {
         try {
+            const filesToDelete = [
+                getFileNameFromUrl(storyToDelete.docx_url),
+                getFileNameFromUrl(storyToDelete.pdf_url)
+            ].filter(Boolean);
+            if (filesToDelete.length > 0)
+                await supabase.storage.from("stories").remove(filesToDelete);
             await supabase.from("stories").delete().eq("id", storyToDelete.id);
             showMessage("הסיפור נמחק בהצלחה!");
             setDeleteDialogOpen(false);
@@ -172,7 +206,7 @@ const FileManager = () => {
                                         size="small"
                                         color={story.docx_url ? "success" : "default"}
                                         variant={story.docx_url ? "filled" : "outlined"}
-                                        onClick={story.docx_url ? () => window.open(`https://docs.google.com/gview?url=${encodeURIComponent(story.docx_url)}&embedded=true`, "_blank") : undefined}
+                                        onClick={story.docx_url ? () => window.open(`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(story.docx_url)}`, "_blank") : undefined}
                                         sx={story.docx_url ? { cursor: "pointer" } : {}}
                                     />
                                     <Chip

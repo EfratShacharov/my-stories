@@ -52,7 +52,7 @@ my-stories/
 |---|---|---|
 | `select id, title, docx_url, pdf_url` | Home, StoryPage, CommentPage | טעינת רשימת סיפורים |
 | `select * order by id` | FileManager | טעינת כל הסיפורים לניהול |
-| `insert { title }` | FileManager.handleSave | הוספת סיפור חדש |
+| `insert { title, docx_url, pdf_url }` | FileManager.handleSave | הוספת סיפור חדש (כולל URLs בבת אחת) |
 | `update { title / docx_url / pdf_url }` | FileManager.handleSave | עדכון סיפור |
 | `delete` | FileManager.handleDeleteConfirm | מחיקת סיפור |
 
@@ -62,10 +62,13 @@ my-stories/
 ```
 
 **Supabase Storage — bucket `stories`:**
-- קבצים נשמרים כ-`story_{id}.docx` / `story_{id}.pdf`
+- קבצים נשמרים לפי שם הקובץ המקורי שהועלה (לא `story_{id}`)
+- תווים עבריים עוברים transliteration לאנגלית, תווים מיוחדים מוחלפים ב-`_`
 - `upsert: true` — מאפשר החלפת קובץ קיים
-- DOCX נפתח דרך Google Docs Viewer: `https://docs.google.com/gview?url=...&embedded=true`
+- DOCX נפתח דרך Office Viewer: `https://view.officeapps.live.com/op/view.aspx?src=...`
 - PDF נפתח ישירות בדפדפן: `window.open(url, "_blank")`
+- במחיקת סיפור — קבצי ה-DOCX וה-PDF נמחקים מה-Storage לפני מחיקת הרשומה מה-DB
+- העלאת קבצים מתבצעת לפני כתיבה ל-DB; אם ה-DB נכשל — הקבצים שהועלו נמחקים (rollback)
 
 **RLS Policies נדרשות על `stories`:**
 ```sql
@@ -241,11 +244,13 @@ const fraction = 1 - (clickX / rect.width);
 
 - עיצוב בסגנון CommentPage — כרטיסי Box לבנים עם צל
 - אווטאר: עיגול כחול עם `AutoStoriesIcon`
-- Chip DOCX (ירוק) — לחיצה פותחת ב-Google Docs Viewer
+- Chip DOCX (ירוק) — לחיצה פותחת ב-Office Viewer
 - Chip PDF (כתום-אדום) — לחיצה פותחת ישירות בדפדפן
 - כפתורי עריכה/מחיקה (`EditIcon` / `DeleteIcon`)
 - דיאלוג הוספה/עריכה: שדה כותרת + העלאת DOCX + העלאת PDF
 - שדה "שם תצוגה" הוסר
+- Realtime subscription על טבלת `stories` — רשימת הסיפורים מתעדכנת אוטומטית בכל שינוי
+- **חשוב:** יש להפעיל Realtime על טבלת `stories` ב-Supabase Dashboard תחת **Database → Replication**
 
 ---
 
