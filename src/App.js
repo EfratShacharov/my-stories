@@ -28,6 +28,30 @@ const cacheRtl = createCache({
 
 const theme = createTheme({
   direction: 'rtl',
+  palette: {
+    primary: { main: '#6c63ff' },
+    secondary: { main: '#f0a500' },
+    background: { default: '#f7f6fb', paper: '#ffffff' },
+    text: { primary: '#1a1a2e', secondary: '#6b7280' },
+  },
+  typography: {
+    fontFamily: `'Segoe UI', 'Helvetica Neue', Arial, sans-serif`,
+    h4: { fontWeight: 800 },
+    h5: { fontWeight: 700 },
+  },
+  shape: { borderRadius: 14 },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: { borderRadius: 10, textTransform: 'none', fontWeight: 600 },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: { borderRadius: 16, boxShadow: '0 2px 16px rgba(108,99,255,0.08)' },
+      },
+    },
+  },
 });
 
 function App() {

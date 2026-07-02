@@ -7,15 +7,16 @@ my-stories/
 ├── public/                    # קבצים סטטיים
 ├── src/
 │   ├── components/
-│   │   ├── Stories.jsx        # ריק — הסיפורים עברו לטבלת Supabase
-│   │   ├── Home.jsx           # דף ראשי – רשימת סיפורים + טופס תגובה לכל סיפור
+│   │   ├── Home.jsx           # דף ראשי – רשימת סיפורים + כפתורי "קרא עוד" ו"מאחורי הקלעים"
 │   │   ├── StoryPage.jsx      # קריאת סיפור + טופס תגובה + progress bar אינטראקטיבי
 │   │   ├── CommentPage.jsx    # עמוד תגובות ציבוריות + טופס הגשה + תגובות משורשרות
 │   │   ├── CommentsManager.jsx# ניהול תגובות (מנהל בלבד) — עיצוב זהה ל-CommentPage
 │   │   ├── FileManager.jsx    # ניהול סיפורים (מנהל בלבד) — Supabase Storage
+│   │   ├── About.jsx          # דף אודות — טקסט סטטי, חלוקה לפסקאות עם כותרות
+│   │   ├── BehindTheScenes.jsx# דף ציבורי — מאחורי הקלעים לפי story_id, רקע כהה
+│   │   ├── BehindManager.jsx  # ניהול מאחורי הקלעים (מנהל בלבד) — CRUD מול Supabase
 │   │   ├── Navbar.jsx         # ניווט עליון
 │   │   ├── AuthModal.jsx      # מודל התחברות / הרשמה / OTP
-│   │   └── AdminLogin.jsx     # (קיים, לא בשימוש פעיל)
 │   ├── context/
 │   │   └── CommentsContext.jsx# Context גלובלי לתגובות + Realtime subscription
 │   ├── supabase.js            # אתחול Supabase client
@@ -137,8 +138,11 @@ App.js
     ├── /                → Home (session, isAdmin)
     ├── /story/:id       → StoryPage (session, isAdmin)
     ├── /comments        → CommentPage (isAdmin, session)
+    ├── /about           → About
+    ├── /behind/:id      → BehindTheScenes
     ├── /files           → FileManager (מנהל בלבד)
-    └── /manage-comments → CommentsManager (מנהל בלבד)
+    ├── /manage-comments → CommentsManager (מנהל בלבד)
+    └── /manage-behind   → BehindManager (מנהל בלבד)
 ```
 
 ### ניהול מצב
@@ -156,7 +160,7 @@ App.js
 |---|---|
 | אורח | קריאת סיפורים, הגשת תגובה עם שם + מייל ידני |
 | משתמש מחובר | הגשת תגובה (שם ומייל נלקחים מה-DB, שדות מוסתרים) |
-| מנהל | הכל + אישור/דחייה/תשובה לתגובות + ניהול סיפורים |
+| מנהל | הכל + אישור/דחייה/תשובה לתגובות + ניהול סיפורים + ניהול מאחורי הקלעים |
 
 ---
 
@@ -202,10 +206,11 @@ const fraction = 1 - (clickX / rect.width);
 
 ## עמוד Home
 
-- סיפורים נטענים מ-Supabase: `select id, title, docx_url`
-- תקציר אוטומטי מ-DOCX דרך `mammoth` (5 שורות, 17 מילים לשורה)
-- כפתור "הוסף תגובה" פותח `Collapse` עם טופס לכל סיפור בנפרד
-- משתמש מחובר — שדות שם/מייל מוסתרים
+- סיפורים נטענים מ-Supabase: `select id, title, docx_url, pdf_url` ממוינים לפי `id`
+- תקציר אוטומטי מ-DOCX דרך `mammoth` (5 שורות, 17 מילים לשורה), מוצג עם `WebkitLineClamp: 10`
+- לכל סיפור שני כפתורים:
+  - **קרא עוד** (`variant="contained"`) — מנווט ל-`/story/:id`
+  - **מאחורי הקלעים** (`variant="outlined"`, צבע זהב, `TheaterComedyIcon`) — מנווט ל-`/behind/:id`
 
 ---
 
@@ -214,10 +219,14 @@ const fraction = 1 - (clickX / rect.width);
 ### CommentPage (ציבורי)
 - מוצגות רק תגובות ראשיות `approved` עם `parent_id = null`
 - רשימת סיפורים לטופס נטענת מ-Supabase (`storiesList`)
+- טופס נפתח/נסגר עם כפתור "הוספת תגובה משלך" / "סגור טופס תגובה"
+- בחירת נושא דרך `Autocomplete`: "תגובה על סיפור" או "אחר"
+  - "תגובה על סיפור" — מציג `Autocomplete` נוסף לבחירת סיפור
+  - "אחר" — מציג שדה טקסט חופשי לנושא
 - תגובות משורשרות מוסתרות כברירת מחדל — כפתור "תגובות (N)"
 - ממוינות כרונולוגית (ישן לחדש)
-- כפתור "השיבו" מוצג בתחתית התגובה (אחרי הCollapse)
-- לחיצה גוללת לטופס ומציגה "משיב/ה לתגובה של [שם]"
+- כפתור "השיבו" מוצג בתחתית התגובה, לחיצה גוללת לטופס ומציגה "משיב/ה לתגובה של [שם]"
+- בעת השבה — שדות נושא מוסתרים, מוצג שם הנמען עם כפתור ביטול
 
 ### הרשאות השבה
 - נושא "אחר" (`story_id = null`) — כולם יכולים להשיב
@@ -232,11 +241,80 @@ const fraction = 1 - (clickX / rect.width);
 
 ### CommentsManager (מנהל)
 - עיצוב זהה ל-CommentPage
-- כל תגובה: Chip סטטוס + שם + תאריך + מייל + נושא + תוכן
-- תגובות משורשרות ממוינות כרונולוגית
+- מציג **כל** התגובות הראשיות (ללא סינון סטטוס)
+- כל תגובה ראשית: Chip סטטוס + שם + תאריך + מייל + נושא + תוכן + כפתורי אשר/דחה/השב
+- תגובות משורשרות ממוינות כרונולוגית (ישן לחדש)
 - תגובות משורשרות של **משתמש**: Chip סטטוס + כפתורי אשר/דחה
-- תגובות משורשרות של **מנהל**: badge כתום בלבד
-- כפתור "השב" פותח textarea לתגובת מנהל
+- תגובות משורשרות של **מנהל**: badge כתום `{name} | מנהלת` בלבד, ללא כפתורי ניהול
+- כפתור "השב" פותח `Collapse` עם `TextField` לתגובת מנהל
+- שם המנהל נשלף מטבלת `users` לפי session בעת טעינה
+
+---
+
+## עמוד About
+
+- טקסט סטטי hardcoded — אין קריאה ל-Supabase
+- חלוקה לפסקאות עם כותרת (`subtitle1`) בצבע primary
+- ציטוט פותח עם קו צד (`borderRight`) ורקע עדין
+- RTL: `direction: rtl` ב-`sx`, `textAlign: right` + `unicodeBidi: plaintext` ב-inline `style` (עקיפת stylis-plugin-rtl)
+- נגיש לכולם דרך `/about`, קישור בניווט
+
+---
+
+## מאחורי הקלעים
+
+### BehindTheScenes (ציבורי — `/behind/:id`)
+- נטען מטבלת `behind_the_scenes` לפי `story_id` מה-URL
+- רקע כהה `#0d0d0d` — ניגוד ויזואלי לשאר האתר
+- מציג: כותרת, ציטוט פותח (`tagline`) עם קו זהב, תוכן חופשי (`content`), תאריך כתיבה
+- אם אין רשומה — מוצג "תוכן בקרוב..."
+- כפתור חזרה לדף הבית
+
+### BehindManager (מנהל בלבד — `/manage-behind`)
+- רקע כהה זהה ל-BehindTheScenes
+- רשימת פריטים עם hover glow זהב
+- כפתורי צפייה / עריכה / מחיקה לכל פריט
+- דיאלוג הוספה/עריכה עם 4 שדות: בחירת סיפור (dropdown), ציטוט, תוכן (8 שורות), תאריך
+- בחירת סיפור ממלאת `story_title` אוטומטית
+- גלילה ללא scrollbar (מוסתר דרך `useEffect` שמוסיף `<style>` זמני)
+- קישור בניווט למנהל בלבד
+
+### טבלת `behind_the_scenes`
+
+**מבנה:**
+```js
+{ id, story_id, story_title, tagline, content, written_at }
+```
+
+**קריאות:**
+
+| פעולה | מתבצע ב | תיאור |
+|---|---|---|
+| `select * where story_id = :id` | BehindTheScenes | טעינת פריט לפי סיפור |
+| `select * order by id` | BehindManager | טעינת כל הפריטים לניהול |
+| `insert` | BehindManager.handleSave | הוספת פריט חדש |
+| `update` | BehindManager.handleSave | עדכון פריט קיים |
+| `delete` | BehindManager.handleDelete | מחיקת פריט |
+
+**RLS Policies:**
+```sql
+CREATE TABLE behind_the_scenes (
+  id bigint generated always as identity primary key,
+  story_id bigint references stories(id) on delete cascade,
+  story_title text,
+  tagline text,
+  content text,
+  written_at date
+);
+
+CREATE POLICY "anyone can read behind_the_scenes"
+  ON behind_the_scenes FOR SELECT USING (true);
+
+CREATE POLICY "admin can manage behind_the_scenes"
+  ON behind_the_scenes FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE behind_the_scenes ENABLE ROW LEVEL SECURITY;
+```
 
 ---
 

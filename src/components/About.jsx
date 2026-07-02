@@ -19,20 +19,21 @@ const Section = ({ title, children }) => (
 );
 
 const About = () => (
-  <Container maxWidth="sm" sx={{ pt: { xs: 10, sm: 11 }, pb: 6 }}>
+  <Box sx={{ bgcolor: '#f7f6fb', minHeight: '100vh', pt: { xs: 10, sm: 11 }, pb: 6 }}>
+  <Container maxWidth="sm" sx={{ pb: 6 }}>
 
     {/* כותרת */}
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5, mb: 1 }}>
-      <Typography variant="h4" sx={{ fontWeight: 800 }}>אודות</Typography>
-      <AutoStoriesIcon color="primary" sx={{ fontSize: 36 }} />
+      <Typography variant="h4" sx={{ fontWeight: 800, color: '#1a1a2e' }}>אודות</Typography>
+      <AutoStoriesIcon sx={{ color: '#6c63ff', fontSize: 36 }} />
     </Box>
+    <Box sx={{ width: 48, height: 3, bgcolor: '#6c63ff', borderRadius: 2, mb: 3 }} style={{ marginRight: 0, marginLeft: 'auto' }} />
 
     {/* ציטוט פותח */}
     <Box sx={{
-      borderRight: '4px solid',
-      borderColor: 'primary.main',
+      borderRight: '4px solid #6c63ff',
       pr: 2, pl: 1, py: 1, mb: 4,
-      bgcolor: 'action.hover',
+      bgcolor: 'rgba(108,99,255,0.04)',
       borderRadius: '0 8px 8px 0',
       ...rtlSx
     }}>
@@ -86,6 +87,7 @@ const About = () => (
     </Typography>
 
   </Container>
+  </Box>
 );
 
 export default About;
