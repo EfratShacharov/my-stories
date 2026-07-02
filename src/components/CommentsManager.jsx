@@ -14,8 +14,9 @@ import AutoStoriesIcon from "@mui/icons-material/AutoStories";
 import { useComments } from "../context/CommentsContext";
 import { supabase } from "../supabase";
 
+const toDate = (dt) => new Date(dt.endsWith("Z") || dt.includes("+") ? dt : dt + "Z");
 const formatDate = (dt) =>
-    `${new Date(dt).toLocaleDateString("en-GB").replace(/\//g, ".")}, ${new Date(dt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}`;
+    `${toDate(dt).toLocaleDateString("en-GB", { timeZone: "Asia/Jerusalem" }).replace(/\//g, ".")}, ${toDate(dt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" })}`;
 
 const getStatusColor = (status) => {
     if (status === "approved") return "success";
@@ -78,10 +79,12 @@ const CommentsManager = () => {
     const mainComments = comments.filter((c) => c.parent_id === null);
 
     return (
-        <Container maxWidth="sm" sx={{ mt: { xs: 9, sm: 10 }, mb: 6, px: { xs: 2, sm: 3 } }}>
-            <Typography variant="h4" gutterBottom align="right">
-                ניהול תגובות
-            </Typography>
+        <Box sx={{ bgcolor: '#f7f6fb', minHeight: '100vh', pt: { xs: 9, sm: 10 }, pb: 6 }}>
+        <Container maxWidth="sm" sx={{ px: { xs: 2, sm: 3 } }}>
+            <Box sx={{ mb: 4, textAlign: 'right' }}>
+                <Typography variant="h4" sx={{ color: '#1a1a2e', fontWeight: 800 }}>ניהול תגובות</Typography>
+                <Box sx={{ width: 48, height: 3, bgcolor: '#6c63ff', borderRadius: 2, mt: 1 }} style={{ marginRight: 0, marginLeft: 'auto' }} />
+            </Box>
 
             {mainComments.map((c) => {
                 const replies = comments
@@ -91,8 +94,9 @@ const CommentsManager = () => {
                 return (
                     <Box key={c.id} dir="rtl" sx={{
                         mt: 2, p: 2.5, borderRadius: 3,
-                        backgroundColor: "#ffffff",
-                        boxShadow: "0 1px 6px rgba(0,0,0,0.1)",
+                        bgcolor: '#fff',
+                        border: '1px solid rgba(108,99,255,0.08)',
+                        boxShadow: '0 2px 12px rgba(108,99,255,0.06)',
                     }}>
                         {/* סטטוס */}
                         <Box sx={{ display: "flex", justifyContent: "flex-start", mb: 1 }}>
@@ -102,12 +106,11 @@ const CommentsManager = () => {
                         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
                             {/* אווטאר */}
                             <Box sx={{
-                                width: 42, height: 42, borderRadius: "50%",
-                                backgroundColor: "#e3f2fd",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                flexShrink: 0,
+                                width: 42, height: 42, borderRadius: '50%',
+                                background: 'linear-gradient(135deg,#6c63ff,#a78bfa)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                             }}>
-                                <CreateIcon sx={{ color: "#1976d2", fontSize: 22 }} />
+                                <CreateIcon sx={{ color: '#fff', fontSize: 20 }} />
                             </Box>
 
                             <Box sx={{ flex: 1 }}>
@@ -134,8 +137,9 @@ const CommentsManager = () => {
                         {replies.map((reply) => (
                             <Box key={reply.id} dir="rtl" sx={{
                                 mt: 2, mr: 4, p: 2, borderRadius: 2,
-                                backgroundColor: reply.is_admin ? "#fff8f0" : "#f5f9ff",
-                                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+                                bgcolor: reply.is_admin ? '#fffbf0' : '#fafafe',
+                                border: `1px solid ${reply.is_admin ? 'rgba(240,165,0,0.15)' : 'rgba(108,99,255,0.08)'}`,
+                                boxShadow: 'none',
                             }}>
                                 {/* סטטוס לתגובות משתמש */}
                                 {!reply.is_admin && (
@@ -146,23 +150,22 @@ const CommentsManager = () => {
 
                                 <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
                                     <Box sx={{
-                                        width: 36, height: 36, borderRadius: "50%",
-                                        backgroundColor: reply.is_admin ? "#fff3e0" : "#e3f2fd",
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        flexShrink: 0,
+                                        width: 36, height: 36, borderRadius: '50%',
+                                        background: reply.is_admin ? 'linear-gradient(135deg,#f0a500,#fbbf24)' : 'linear-gradient(135deg,#6c63ff,#a78bfa)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                                     }}>
                                         {reply.is_admin
-                                            ? <AutoStoriesIcon sx={{ color: "#e65100", fontSize: 20 }} />
-                                            : <CreateIcon sx={{ color: "#1976d2", fontSize: 20 }} />
+                                            ? <AutoStoriesIcon sx={{ color: '#fff', fontSize: 18 }} />
+                                            : <CreateIcon sx={{ color: '#fff', fontSize: 18 }} />
                                         }
                                     </Box>
                                     <Box sx={{ flex: 1 }}>
                                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                             {reply.is_admin ? (
                                                 <Typography variant="caption" sx={{
-                                                    backgroundColor: "#e65100", color: "white",
-                                                    px: 1, py: 0.2, borderRadius: 1,
-                                                    fontWeight: "bold", fontSize: "0.7rem",
+                                                    background: 'linear-gradient(135deg,#f0a500,#fbbf24)',
+                                                    color: '#fff', px: 1, py: 0.2, borderRadius: 1,
+                                                    fontWeight: 700, fontSize: '0.7rem',
                                                 }}>
                                                     {reply.name} | מנהלת
                                                 </Typography>
@@ -236,6 +239,7 @@ const CommentsManager = () => {
                 );
             })}
         </Container>
+        </Box>
     );
 };
 

@@ -148,14 +148,20 @@ const FileManager = () => {
     };
 
     return (
-        <Container maxWidth="sm" sx={{ mt: { xs: 9, sm: 10 }, mb: 6, px: { xs: 2, sm: 3 } }}>
+        <Box sx={{ bgcolor: '#f7f6fb', minHeight: '100vh', pt: { xs: 9, sm: 10 }, pb: 6 }}>
+        <Container maxWidth="sm" sx={{ px: { xs: 2, sm: 3 } }}>
 
             {/* כותרת */}
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }} dir="rtl">
-                <Typography variant="h4" fontWeight="bold">ניהול סיפורים</Typography>
-                <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd} sx={{ borderRadius: 2 }}>
+                <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd}
+                    sx={{ background: 'linear-gradient(135deg,#6c63ff,#a78bfa)', boxShadow: 'none', borderRadius: 2,
+                        '&:hover': { boxShadow: '0 4px 14px rgba(108,99,255,0.35)' } }}>
                     הוסף סיפור
                 </Button>
+                <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="h4" fontWeight="bold" sx={{ color: '#1a1a2e' }}>ניהול סיפורים</Typography>
+                    <Box sx={{ width: 48, height: 3, bgcolor: '#6c63ff', borderRadius: 2, mt: 0.5 }} style={{ marginRight: 0, marginLeft: 'auto' }} />
+                </Box>
             </Box>
 
             {/* הודעה */}
@@ -178,20 +184,21 @@ const FileManager = () => {
                 stories.map((story) => (
                     <Box key={story.id} dir="rtl" sx={{
                         mt: 2, p: 2.5, borderRadius: 3,
-                        backgroundColor: "#ffffff",
-                        boxShadow: "0 1px 6px rgba(0,0,0,0.1)",
-                        transition: "box-shadow 0.2s",
-                        "&:hover": { boxShadow: "0 4px 16px rgba(0,0,0,0.13)" },
+                        bgcolor: '#fff',
+                        border: '1px solid rgba(108,99,255,0.08)',
+                        boxShadow: '0 2px 12px rgba(108,99,255,0.06)',
+                        transition: 'box-shadow 0.2s',
+                        '&:hover': { boxShadow: '0 4px 20px rgba(108,99,255,0.12)' },
                     }}>
                         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
                             {/* אווטאר */}
                             <Box sx={{
-                                width: 48, height: 48, borderRadius: "50%",
-                                background: "linear-gradient(135deg, #1976d2, #42a5f5)",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                flexShrink: 0, boxShadow: "0 2px 8px rgba(25,118,210,0.3)",
+                                width: 48, height: 48, borderRadius: '50%',
+                                background: 'linear-gradient(135deg,#6c63ff,#a78bfa)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                flexShrink: 0, boxShadow: '0 2px 8px rgba(108,99,255,0.3)',
                             }}>
-                                <AutoStoriesIcon sx={{ color: "white", fontSize: 24 }} />
+                                <AutoStoriesIcon sx={{ color: 'white', fontSize: 24 }} />
                             </Box>
 
                             {/* כותרת + קבצים */}
@@ -287,6 +294,7 @@ const FileManager = () => {
                 </DialogActions>
             </Dialog>
         </Container>
+        </Box>
     );
 };
 

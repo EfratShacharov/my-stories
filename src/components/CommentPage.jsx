@@ -1,3 +1,4 @@
+import React, { useEffect, useRef, useState } from "react";
 import {
     Autocomplete,
     Box,
@@ -9,10 +10,12 @@ import {
 } from "@mui/material";
 import CreateIcon from "@mui/icons-material/Create";
 import AutoStoriesIcon from "@mui/icons-material/AutoStories";
-
-import React, { useEffect, useRef, useState } from "react";
 import { useComments } from "../context/CommentsContext";
 import { supabase } from "../supabase";
+
+const toDate = (dt) => new Date(dt.endsWith("Z") || dt.includes("+") ? dt : dt + "Z");
+const fmtDate = (dt) => toDate(dt).toLocaleDateString("en-GB", { timeZone: "Asia/Jerusalem" }).replace(/\//g, ".");
+const fmtTime = (dt) => toDate(dt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" });
 
 const CommentPage = ({ isAdmin, session }) => {
     const { comments, addComment } = useComments();
@@ -125,11 +128,13 @@ const CommentPage = ({ isAdmin, session }) => {
     );
 
     return (
-        <Container maxWidth="sm" sx={{ mt: { xs: 9, sm: 10 }, mb: 6, px: { xs: 2, sm: 3 } }}>
+        <Box sx={{ bgcolor: '#f7f6fb', minHeight: '100vh', pt: { xs: 9, sm: 10 }, pb: 6 }}>
+        <Container maxWidth="sm" sx={{ px: { xs: 2, sm: 3 } }}>
 
-            <Typography variant="h4" gutterBottom align="right">
-                תגובות
-            </Typography>
+            <Box sx={{ mb: 4, textAlign: 'right' }}>
+                <Typography variant="h4" sx={{ color: '#1a1a2e', fontWeight: 800 }}>תגובות</Typography>
+                <Box sx={{ width: 48, height: 3, bgcolor: '#6c63ff', borderRadius: 2, mt: 1 }} style={{ marginRight: 0, marginLeft: 'auto' }} />
+            </Box>
 
             {approvedMainComments.map((c) => {
                 const adminReplies = comments
@@ -141,23 +146,24 @@ const CommentPage = ({ isAdmin, session }) => {
                         key={c.id}
                         dir="rtl"
                         sx={{
-                            mt: 2,
-                            p: 2.5,
-                            borderRadius: 3,
-                            backgroundColor: "#ffffff",
-                            boxShadow: "0 1px 6px rgba(0,0,0,0.1)",
+                            mt: 2, p: 2.5, borderRadius: 3,
+                            bgcolor: '#fff',
+                            border: '1px solid rgba(108,99,255,0.08)',
+                            boxShadow: '0 2px 12px rgba(108,99,255,0.06)',
+                            transition: 'box-shadow 0.2s',
+                            '&:hover': { boxShadow: '0 4px 20px rgba(108,99,255,0.12)' },
                         }}
                     >
                         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
                             {/* אווטאר משתמש */}
                             <Box sx={{
                                 width: 42, height: 42,
-                                borderRadius: "50%",
-                                backgroundColor: "#e3f2fd",
-                                display: "flex", alignItems: "center", justifyContent: "center",
+                                borderRadius: '50%',
+                                background: 'linear-gradient(135deg,#6c63ff,#a78bfa)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 flexShrink: 0,
                             }}>
-                                <CreateIcon sx={{ color: "#1976d2", fontSize: 22 }} />
+                                <CreateIcon sx={{ color: '#fff', fontSize: 20 }} />
                             </Box>
 
                             {/* שם + תאריך + נושא */}
@@ -167,7 +173,7 @@ const CommentPage = ({ isAdmin, session }) => {
                                         {c.name}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                        ({new Date(c.created_at).toLocaleDateString("en-GB").replace(/\//g, ".")}, {new Date(c.created_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })})
+                                        ({fmtDate(c.created_at)}, {fmtTime(c.created_at)})
                                     </Typography>
                                 </Box>
                                 <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
@@ -187,7 +193,8 @@ const CommentPage = ({ isAdmin, session }) => {
                                     size="small"
                                     variant="outlined"
                                     onClick={() => toggleReplies(c.id)}
-                                    sx={{ fontSize: "0.75rem", borderColor: "#e65100", color: "#e65100" }}
+                                    sx={{ fontSize: '0.75rem', borderColor: '#f0a500', color: '#b07800',
+                                        borderRadius: 2, '&:hover': { bgcolor: 'rgba(240,165,0,0.06)' } }}
                                 >
                                     {expandedReplies[c.id] ? "הסתר תגובות" : `תגובות (${adminReplies.length})`}
                                 </Button>
@@ -200,34 +207,33 @@ const CommentPage = ({ isAdmin, session }) => {
                                 key={reply.id}
                                 dir="rtl"
                                 sx={{
-                                    mt: 2,
-                                    mr: 4,
-                                    p: 2,
-                                    borderRadius: 2,
-                                    backgroundColor: reply.is_admin ? "#fff8f0" : "#ffffff",
-                                    boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+                                    mt: 2, mr: 4, p: 2, borderRadius: 2,
+                                        bgcolor: reply.is_admin ? '#fffbf0' : '#fafafe',
+                                        border: `1px solid ${reply.is_admin ? 'rgba(240,165,0,0.15)' : 'rgba(108,99,255,0.08)'}`,
+                                        boxShadow: 'none',
                                 }}
                             >
                                 <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
                                     <Box sx={{
                                         width: 36, height: 36,
-                                        borderRadius: "50%",
-                                        backgroundColor: reply.is_admin ? "#fff3e0" : "#e3f2fd",
-                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        borderRadius: '50%',
+                                        background: reply.is_admin ? 'linear-gradient(135deg,#f0a500,#fbbf24)' : 'linear-gradient(135deg,#6c63ff,#a78bfa)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         flexShrink: 0,
                                     }}>
                                         {reply.is_admin
-                                            ? <AutoStoriesIcon sx={{ color: "#e65100", fontSize: 20 }} />
-                                            : <CreateIcon sx={{ color: "#1976d2", fontSize: 20 }} />
+                                            ? <AutoStoriesIcon sx={{ color: '#fff', fontSize: 18 }} />
+                                            : <CreateIcon sx={{ color: '#fff', fontSize: 18 }} />
                                         }
                                     </Box>
                                     <Box sx={{ flex: 1 }}>
                                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                             {reply.is_admin ? (
                                                 <Typography variant="caption" sx={{
-                                                    backgroundColor: "#e65100", color: "white",
+                                                    background: 'linear-gradient(135deg,#f0a500,#fbbf24)',
+                                                    color: '#fff',
                                                     px: 1, py: 0.2, borderRadius: 1,
-                                                    fontWeight: "bold", fontSize: "0.7rem",
+                                                    fontWeight: 700, fontSize: '0.7rem',
                                                 }}>
                                                     {reply.name} | מנהלת
                                                 </Typography>
@@ -237,7 +243,7 @@ const CommentPage = ({ isAdmin, session }) => {
                                                 </Typography>
                                             )}
                                             <Typography variant="caption" color="text.secondary">
-                                                ({new Date(reply.created_at).toLocaleDateString("en-GB").replace(/\//g, ".")}, {new Date(reply.created_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })})
+                                                ({fmtDate(reply.created_at)}, {fmtTime(reply.created_at)})
                                             </Typography>
                                         </Box>
                                         <Typography variant="body2" sx={{ mt: 0.5, color: "#444", lineHeight: 1.8 }}>
@@ -253,7 +259,7 @@ const CommentPage = ({ isAdmin, session }) => {
                             <Box sx={{ mt: 1.5, mr: 7 }}>
                                 <Button size="small" variant="text"
                                     onClick={() => handleReplyClick(c)}
-                                    sx={{ fontSize: "0.75rem", color: "#1976d2", p: 0 }}
+                                    sx={{ fontSize: '0.75rem', color: '#6c63ff', p: 0, fontWeight: 600 }}
                                 >
                                     השיבו
                                 </Button>
@@ -264,12 +270,11 @@ const CommentPage = ({ isAdmin, session }) => {
             })}
 
             {/* כפתור פתיחת טופס */}
-            <Box sx={{ mt: 5, textAlign: "center" }}>
-                <Button
-                    variant="contained"
-                    onClick={() => { setShowForm((prev) => !prev); setReplyTo(null); }}
-                >
-                    {showForm ? "סגור טופס תגובה" : "הוספת תגובה משלך"}
+            <Box sx={{ mt: 5, textAlign: 'center' }}>
+                <Button variant="contained" onClick={() => { setShowForm((prev) => !prev); setReplyTo(null); }}
+                    sx={{ background: 'linear-gradient(135deg,#6c63ff,#a78bfa)', boxShadow: 'none', px: 3,
+                        '&:hover': { boxShadow: '0 4px 14px rgba(108,99,255,0.35)' } }}>
+                    {showForm ? 'סגור טופס תגובה' : 'הוספת תגובה משלך'}
                 </Button>
             </Box>
 
@@ -378,14 +383,17 @@ const CommentPage = ({ isAdmin, session }) => {
                         </Typography>
                     )}
 
-                    <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
-                        <Button variant="contained" onClick={handleSubmit}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                        <Button variant="contained" onClick={handleSubmit}
+                            sx={{ background: 'linear-gradient(135deg,#6c63ff,#a78bfa)', boxShadow: 'none', px: 3,
+                                '&:hover': { boxShadow: '0 4px 14px rgba(108,99,255,0.35)' } }}>
                             שלח תגובה
                         </Button>
                     </Box>
                 </Box>
             </Collapse>
         </Container>
+        </Box>
     );
 };
 
