@@ -148,7 +148,7 @@ const FileManager = () => {
     };
 
     return (
-        <Container maxWidth="sm" sx={{ mt: 10, mb: 6 }}>
+        <Container maxWidth="sm" sx={{ mt: { xs: 9, sm: 10 }, mb: 6, px: { xs: 2, sm: 3 } }}>
 
             {/* כותרת */}
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }} dir="rtl">
@@ -255,14 +255,14 @@ const FileManager = () => {
                     <Box>
                         <Typography variant="body2" color="text.secondary" gutterBottom>קובץ DOCX</Typography>
                         <Button variant="outlined" component="label" startIcon={<UploadFileIcon />} fullWidth>
-                            {docxFile ? docxFile.name : "בחר קובץ DOCX"}
+                            {docxFile ? docxFile.name : (editStory?.docx_url ? getFileNameFromUrl(editStory.docx_url) : "בחר קובץ DOCX")}
                             <input type="file" accept=".docx" hidden onChange={e => setDocxFile(e.target.files[0])} />
                         </Button>
                     </Box>
                     <Box>
                         <Typography variant="body2" color="text.secondary" gutterBottom>קובץ PDF</Typography>
                         <Button variant="outlined" component="label" startIcon={<UploadFileIcon />} fullWidth>
-                            {pdfFile ? pdfFile.name : "בחר קובץ PDF"}
+                            {pdfFile ? pdfFile.name : (editStory?.pdf_url ? getFileNameFromUrl(editStory.pdf_url) : "בחר קובץ PDF")}
                             <input type="file" accept=".pdf" hidden onChange={e => setPdfFile(e.target.files[0])} />
                         </Button>
                     </Box>

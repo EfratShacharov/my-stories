@@ -12,6 +12,9 @@ import Navbar from './components/Navbar';
 import StoryPage from './components/StoryPage';
 import FileManager from './components/FileManager';
 import CommentsManager from './components/CommentsManager';
+import About from './components/About';
+import BehindTheScenes from './components/BehindTheScenes';
+import BehindManager from './components/BehindManager';
 import AuthModal from './components/AuthModal';
 
 import './index.css';
@@ -132,6 +135,9 @@ function App() {
                   path="/manage-comments"
                   element={isAdmin ? <CommentsManager /> : <Home />}
                 />
+                <Route path="/about" element={<About />} />
+                <Route path="/behind/:id" element={<BehindTheScenes />} />
+                <Route path="/manage-behind" element={isAdmin ? <BehindManager /> : <Home />} />
               </Routes>
             </div>
 
