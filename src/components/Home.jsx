@@ -1,4 +1,5 @@
-import { Button, Card, CardContent, Container, Typography } from '@mui/material';
+import { Box, Button, Card, CardContent, Container, Typography } from '@mui/material';
+import TheaterComedyIcon from '@mui/icons-material/TheaterComedy';
 import * as mammoth from 'mammoth';
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -78,7 +79,7 @@ const Home = () => {
 
     if (loading) return null;
     return (
-        <Container sx={{ p: 2 }}>
+        <Container sx={{ pt: { xs: 9, sm: 10 }, pb: 4, px: { xs: 2, sm: 3 } }}>
             <Typography variant="h4" style={{ marginBottom: 20, textAlign: 'right' }}>
                 רשימת סיפורים
             </Typography>
@@ -101,14 +102,24 @@ const Home = () => {
                         >
                             {summaries[story.id] || "טוען תקציר..."}
                         </Typography>
-                        <Button
-                            variant="contained"
-                            style={{ marginTop: 10 }}
-                            component={Link}
-                            to={`/story/${story.id}`}
-                        >
-                            קרא עוד
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
+                            <Button
+                                variant="contained"
+                                component={Link}
+                                to={`/story/${story.id}`}
+                            >
+                                קרא עוד
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                component={Link}
+                                to={`/behind/${story.id}`}
+                                startIcon={<TheaterComedyIcon />}
+                                sx={{ borderColor: '#f0a500', color: '#b07800', '&:hover': { bgcolor: 'rgba(240,165,0,0.08)', borderColor: '#f0a500' } }}
+                            >
+                                מאחורי הקלעים
+                            </Button>
+                        </Box>
                     </CardContent>
                 </Card>
             ))}

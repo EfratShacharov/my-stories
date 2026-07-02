@@ -78,7 +78,7 @@ const CommentsManager = () => {
     const mainComments = comments.filter((c) => c.parent_id === null);
 
     return (
-        <Container maxWidth="sm" sx={{ mt: 10 }}>
+        <Container maxWidth="sm" sx={{ mt: { xs: 9, sm: 10 }, mb: 6, px: { xs: 2, sm: 3 } }}>
             <Typography variant="h4" gutterBottom align="right">
                 ניהול תגובות
             </Typography>
