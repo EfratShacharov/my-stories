@@ -25,6 +25,7 @@ Deno.serve(async (req: Request) => {
   const EMAILJS_TEMPLATE_ID = Deno.env.get("EMAILJS_TEMPLATE_ID");
   const EMAILJS_PUBLIC_KEY = Deno.env.get("EMAILJS_PUBLIC_KEY") ?? Deno.env.get("EMAILJS_USER_ID");
   const EMAILJS_PRIVATE_KEY = Deno.env.get("EMAILJS_PRIVATE_KEY") ?? Deno.env.get("EMAILJS_ACCESS_TOKEN");
+  const SEND_EMAILS = Deno.env.get("SEND_EMAILS") === "true";
 
   console.log("env check:", {
     SUPABASE_URL: !!SUPABASE_URL,
@@ -80,6 +81,13 @@ Deno.serve(async (req: Request) => {
   }
 
   const link = `${SITE_URL}/comments?highlight=${newComment.id}&parent=${parentComment.id}`;
+  if (!SEND_EMAILS) {
+    console.log("Email sending disabled");
+    return new Response("Email sending disabled", {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
   console.log("Sending email to:", parentComment.email);
 
   const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
