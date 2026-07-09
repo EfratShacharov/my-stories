@@ -31,7 +31,7 @@ const getStatusLabel = (status) => {
 };
 
 const CommentsManager = () => {
-    const { comments, fetchComments } = useComments();
+    const { comments, fetchComments, notifyReply } = useComments();
     const [loading, setLoading] = useState(false);
     const [replyInputs, setReplyInputs] = useState({});
     const [openReply, setOpenReply] = useState({});
@@ -58,7 +58,8 @@ const CommentsManager = () => {
     const sendReply = async (comment) => {
         const text = replyInputs[comment.id];
         if (!text?.trim()) return;
-        const { error } = await supabase.from("comments").insert([{
+
+        const { data, error } = await supabase.from("comments").insert([{
             name: adminName,
             story_id: comment.story_id,
             story_title: comment.story_title,
@@ -67,8 +68,14 @@ const CommentsManager = () => {
             is_admin: true,
             status: "approved",
             parent_id: comment.id,
-        }]);
+        }]).select("id").maybeSingle();
+
         if (error) { console.error(error); return; }
+
+        if (data?.id) {
+            await notifyReply(data.id);
+        }
+
         setReplyInputs((prev) => ({ ...prev, [comment.id]: "" }));
         setOpenReply((prev) => ({ ...prev, [comment.id]: false }));
         await fetchComments();

@@ -18,11 +18,16 @@ my-stories/
 │   │   ├── Navbar.jsx         # ניווט עליון
 │   │   ├── AuthModal.jsx      # מודל התחברות / הרשמה / OTP
 │   ├── context/
-│   │   └── CommentsContext.jsx# Context גלובלי לתגובות + Realtime subscription
+│   │   └── CommentsContext.jsx# Context גלובלי לתגובות + Realtime subscription + קריאה ל-edge function
 │   ├── supabase.js            # אתחול Supabase client
 │   ├── App.js                 # נתב ראשי + ניהול session
 │   └── index.js               # נקודת כניסה
-├── .env                       # משתני סביבה
+├── supabase/
+│   └── functions/
+│       └── notify-reply/
+│           └── index.ts       # Edge Function לשליחת מייל למגיבי-על לאחר תשובה
+├── .env                       # משתני סביבה לפרונטאנד
+├── init.md                    # תיעוד הפרויקט
 └── package.json
 ```
 
@@ -36,11 +41,14 @@ my-stories/
 | React Router DOM | 7 | ניווט בין עמודים |
 | MUI (Material UI) | 7 | רכיבי UI |
 | @mui/icons-material | 7 | אייקונים (CreateIcon, AutoStoriesIcon, DownloadIcon, ArrowForwardIcon וכו') |
+| @chakra-ui/react | 3 | רכיבי UI נוספים |
 | Emotion | 11 | CSS-in-JS |
 | stylis-plugin-rtl | 2 | תמיכה גלובלית בכיוון RTL |
 | Supabase JS | 2 | Backend: auth + database + storage + Realtime |
-| EmailJS | 3 | שליחת OTP במייל למנהל |
+| EmailJS | 3 | שליחת OTP + התראות למייל על תגובות |
 | mammoth | 1 | המרת קבצי DOCX לטקסט |
+| pdfjs-dist | 5 | קריאת PDFים בתוך האפליקציה |
+| firebase | 12 | שימושים נלווים/אופציונליים |
 | framer-motion | 12 | אנימציות |
 
 ---
@@ -84,9 +92,11 @@ CREATE POLICY "admin can delete stories" ON stories FOR DELETE TO authenticated 
 | פעולה | מתבצע ב | תיאור |
 |---|---|---|
 | `select * order by created_at desc` | CommentsContext.fetchComments | טעינת כל התגובות |
-| `insert` | CommentsContext.addComment | הוספת תגובה חדשה |
+| `insert` | CommentsContext.addComment | הוספת תגובה חדשה; מחזיר את `id` החדש |
 | `update { status }` | CommentsManager.updateStatus | אישור / דחיית תגובה |
 | `insert` (is_admin: true, status: approved) | CommentsManager.sendReply | תגובת מנהל |
+| `notifyReply(commentId)` | CommentsContext + CommentPage + CommentsManager | לאחר תגובה משורשרת, מופעל edge function `notify-reply` |
+| `POST /functions/v1/notify-reply` | Supabase Edge Function | שולח מייל למי שבחר באפשרות עדכונים, אם יש תשובה להורה |
 | Realtime `postgres_changes *` | CommentsContext useEffect | עדכון אוטומטי בכל שינוי |
 
 **מבנה רשומת comment:**
@@ -99,6 +109,7 @@ CREATE POLICY "admin can delete stories" ON stories FOR DELETE TO authenticated 
   is_admin,       // boolean
   status,         // "pending" | "approved" | "rejected"
   parent_id,      // null = תגובה ראשית, id = תגובה משורשרת
+  email_updates,  // boolean — האם לשלוח עדכון במייל כשמשיבים
   created_at
 }
 ```
@@ -109,6 +120,12 @@ CREATE POLICY "admin can delete stories" ON stories FOR DELETE TO authenticated 
 - `UPDATE` – מותר ל-`authenticated` בלבד
 
 **חשוב:** יש לוודא שה-Realtime מופעל על טבלת `comments` ב-Supabase Dashboard תחת **Database → Replication**
+
+### הודעות מייל על תגובות
+- כאשר מגיב/ה משיב/ה לתגובה קיימת, ה-frontend מקים את התגובה ומעביר את ה-`id` ל-`notifyReply`.
+- ה-Edge Function `supabase/functions/notify-reply/index.ts` בודק אם לתגובה ההורה יש `email_updates = true`, אם יש כתובת מייל, ואם לא מדובר באותו אדם.
+- אם התנאים מתקיימים, הוא שולח מייל דרך EmailJS עם קישור חזרה אל התגובה/תגובה-האב.
+- ההפעלה מתבצעת גם מ-CommentPage (תגובה של משתמש) וגם מ-CommentsManager (תגובה של מנהל).
 
 ### טבלת `users`
 
@@ -227,6 +244,14 @@ const fraction = 1 - (clickX / rect.width);
 - ממוינות כרונולוגית (ישן לחדש)
 - כפתור "השיבו" מוצג בתחתית התגובה, לחיצה גוללת לטופס ומציגה "משיב/ה לתגובה של [שם]"
 - בעת השבה — שדות נושא מוסתרים, מוצג שם הנמען עם כפתור ביטול
+- צ'קבוקס "שלחו לי עדכון במייל" בטופס הראשי ובטופס תגובה לתגובה
+- ליד שדה המייל: "המייל לא יוצג באתר"
+- ספינר + כיבוי כפתור בזמן שליחה
+- הודעת הצלחה: "התגובה תפורסם לאחר אישור מנהל האתר"
+- ספירת תווים בשדה תוכן התגובה (500 תווים)
+- שמירת טיוטאה ב-localStorage (שדות טקסט, שם, מייל)
+- Optimistic UI: תגובה מוצגת מידית עם תגית "ממתין לאישור" לפני קבלת אישור מנהל
+- אנימציית כניסה לתגובות חדשות דרך framer-motion
 
 ### הרשאות השבה
 - נושא "אחר" (`story_id = null`) — כולם יכולים להשיב
@@ -332,7 +357,9 @@ ALTER TABLE behind_the_scenes ENABLE ROW LEVEL SECURITY;
 
 ---
 
-## משתני סביבה נדרשים (`.env`)
+## משתני סביבה נדרשים
+
+### Frontend (`.env`)
 
 ```
 REACT_APP_SUPABASE_URL=
@@ -340,3 +367,18 @@ REACT_APP_SUPABASE_ANON_KEY=
 REACT_APP_ADMIN_EMAIL=
 REACT_APP_ADMIN_PASSWORD=
 ```
+
+### Edge Function Secrets ב-Supabase
+ב-Supabase Dashboard → Edge Functions → Secrets יש להגדיר:
+
+```
+MY_SUPABASE_URL=
+MY_SERVICE_ROLE_KEY=
+EMAILJS_SERVICE_ID=
+EMAILJS_TEMPLATE_ID=
+EMAILJS_PUBLIC_KEY=
+EMAILJS_PRIVATE_KEY=
+SITE_URL=http://localhost:3000   # או domen מלא ב-production
+```
+
+> `EMAILJS_PRIVATE_KEY` נקרא גם `accessToken` בחשבון EmailJS; יש לוודא שה-EmailJS account מאפשר שימוש שרת-סייד/Server-side API. 

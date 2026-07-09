@@ -37,7 +37,7 @@ export const CommentsProvider = ({ children }) => {
         return () => supabase.removeChannel(subscription);
     }, []);
 
-    const addComment = async (name, storyId, subject, text, email, isAdmin = false, parentId = null, userId = null) => {
+    const addComment = async (name, storyId, subject, text, email, isAdmin = false, parentId = null, userId = null, emailUpdates = false) => {
 
         let resolvedName = name || "";
         let resolvedEmail = email || "";
@@ -64,22 +64,39 @@ export const CommentsProvider = ({ children }) => {
             is_admin: isAdmin,
             status: isAdmin ? "approved" : "pending",
             parent_id: parentId || null,
+            email_updates: emailUpdates,
         };
 
         console.log("newComment:", newComment);
-        const session = await supabase.auth.getSession();
 
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from("comments")
-            .insert([newComment]);
+            .insert([newComment])
+            .select("id")
+            .maybeSingle();
 
         if (error) {
             console.error("INSERT ERROR:", error);
+            return null;
+        }
+
+        return data?.id || null;
+    };
+
+    const notifyReply = async (commentId) => {
+        if (!commentId) return;
+
+        const { error } = await supabase.functions.invoke("notify-reply", {
+            body: JSON.stringify({ comment_id: commentId }),
+        });
+
+        if (error) {
+            console.error("notifyReply error:", error);
         }
     };
 
     return (
-        <CommentsContext.Provider value={{ comments, addComment, fetchComments }}>
+        <CommentsContext.Provider value={{ comments, addComment, fetchComments, notifyReply }}>
             {children}
         </CommentsContext.Provider>
     );
