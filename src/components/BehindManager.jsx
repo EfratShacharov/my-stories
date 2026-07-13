@@ -204,7 +204,7 @@ const BehindManager = () => {
                                 {/* כפתורים */}
                                 <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
                                     <Tooltip title="צפה בדף">
-                                        <IconButton size="small" component={Link} to={`/behind/${item.story_id}`}
+                                        <IconButton size="small" component={Link} to={`/behind/${item.story_id}`} state={{ from: '/manage-behind' }}
                                             sx={{ color: '#f0a500', bgcolor: 'rgba(240,165,0,0.1)', '&:hover': { bgcolor: 'rgba(240,165,0,0.2)' } }}>
                                             <VisibilityIcon fontSize="small" />
                                         </IconButton>

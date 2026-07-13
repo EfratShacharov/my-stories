@@ -2,7 +2,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import TheaterComedyIcon from '@mui/icons-material/TheaterComedy';
 import { Box, CircularProgress, Container, Divider, IconButton, Tooltip, Typography } from '@mui/material';
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { supabase } from '../supabase';
 
 const rtlStyle = { textAlign: 'right', unicodeBidi: 'plaintext' };
@@ -10,6 +10,8 @@ const rtlSx = { direction: 'rtl' };
 
 const BehindTheScenes = () => {
   const { id } = useParams();
+  const location = useLocation();
+  const backTo = location.state?.from || '/';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,8 +40,8 @@ const BehindTheScenes = () => {
 
         {/* כפתור חזרה */}
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
-          <Tooltip title="חזור לדף הבית">
-            <IconButton component={Link} to="/" sx={{ color: '#aaa' }}>
+          <Tooltip title={backTo === '/manage-behind' ? 'חזור לניהול' : 'חזור לדף הבית'}>
+            <IconButton component={Link} to={backTo} sx={{ color: '#aaa' }}>
               <ArrowForwardIcon />
             </IconButton>
           </Tooltip>
