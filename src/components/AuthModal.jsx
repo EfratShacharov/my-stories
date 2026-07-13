@@ -2,7 +2,6 @@ import { supabase } from "../supabase";
 import { Alert, Box, Button, Checkbox, CircularProgress, Divider, FormControlLabel, IconButton, Modal, TextField, Typography } from "@mui/material";
 import CloseIcon from '@mui/icons-material/Close';
 import { useState, useRef, useEffect } from "react";
-import emailjs from 'emailjs-com';
 import InputAdornment from '@mui/material/InputAdornment';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -13,9 +12,10 @@ const style = {
     left: '50%',
     transform: 'translate(-50%,-50%)',
     width: 400,
-    bgcolor: 'background.paper',
+    bgcolor: '#fff',
     borderRadius: 3,
-    boxShadow: 24,
+    boxShadow: '0 4px 32px rgba(108,99,255,0.13)',
+    border: '1px solid rgba(108,99,255,0.08)',
     p: 4,
 };
 
@@ -61,11 +61,12 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
 
         if (error) {
             setError("המייל או הסיסמה שגויים");
+            console.error("Login error:", error);
             setLoading(false);
             return;
         }
 
-        /// אם זה המנהל → שולחים OTP דרך EmailJS
+        /// אם זה המנהל → שולחים OTP דרך Supabase
         if (email === adminEmail) {
             await sendOtp(email);
             setMode("otp");
@@ -85,7 +86,7 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
         onClose();
     };
 
-    // ======= אימות OTP =======ץ
+    // ======= אימות OTP =======
     const generateOTP = (length = 6) => {
         const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
         return Array.from({ length }, () =>
@@ -94,33 +95,29 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
     };
 
     const sendOtp = async (targetEmail) => {
-        try {
-            setLoading(true);
-            const otpCode = generateOTP();
-            setGeneratedOtp(otpCode);
-            const expireAt = Date.now() + 5 * 60 * 1000;
+        setLoading(true);
+        const otpCode = generateOTP();
+        setGeneratedOtp(otpCode);
 
-            await emailjs.send(
-                "service_mbhv7lb",
-                "template_c88sgdl",
-                {
-                    email: targetEmail,
-                    passcode: otpCode,
-                    time: new Date(expireAt).toLocaleTimeString()
-                },
-                "oK5wn2dt8-Nwik3Ob"
-            );
+        const { error } = await supabase.functions.invoke("send-otp", {
+            body: JSON.stringify({
+                email: targetEmail,
+                otpCode,
+                expireTime: new Date(Date.now() + 5 * 60 * 1000).toLocaleTimeString()
+            }),
+        });
 
+        if (error) {
+            console.error("sendOtp error:", error);
+            setError("אירעה שגיאה בשליחת הקוד");
+        } else {
             setOtpEmail(targetEmail);
             setOtpExpired(false);
             setOtpErrorMessage("");
             setOtp(["", "", "", "", "", ""]);
-        } catch (err) {
-            console.error(err);
-            setError("אירעה שגיאה בשליחת הקוד");
-        } finally {
-            setLoading(false);
         }
+
+        setLoading(false);
     };
 
     const resendOtp = () => sendOtp(otpEmail);
@@ -243,7 +240,7 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
                     <CloseIcon />
                 </IconButton>
 
-                <Typography variant="h6" mb={2} textAlign="center" sx={{ mb: 2 }} mt={1}>
+                <Typography variant="h6" mb={2} textAlign="center" sx={{ mb: 2, fontWeight: 800, color: '#1a1a2e' }} mt={1}>
                     {mode === "login" && "התחברות"}
                     {mode === "register" && "הרשמה"}
                     {mode === "otp" && "אימות דו-שלבי"}
@@ -295,7 +292,10 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
                             }}
                         />
 
-                        <Button variant="contained" fullWidth disabled={loading} onClick={handleLogin}>
+                        <Button variant="contained" fullWidth disabled={loading} onClick={handleLogin}
+                            sx={{ background: 'linear-gradient(135deg,#6c63ff,#a78bfa)', boxShadow: 'none',
+                                '&:hover': { boxShadow: '0 4px 14px rgba(108,99,255,0.35)' },
+                                '&.Mui-disabled': { background: 'rgba(108,99,255,0.4)', color: '#fff' } }}>
                             {loading ? <CircularProgress size={24} color="inherit" /> : "התחבר"}
                         </Button>
 
@@ -376,7 +376,10 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
                             sx={{ mb: 2 }}
                         />
 
-                        <Button variant="contained" fullWidth disabled={loading} onClick={handleRegister}>
+                        <Button variant="contained" fullWidth disabled={loading} onClick={handleRegister}
+                            sx={{ background: 'linear-gradient(135deg,#6c63ff,#a78bfa)', boxShadow: 'none',
+                                '&:hover': { boxShadow: '0 4px 14px rgba(108,99,255,0.35)' },
+                                '&.Mui-disabled': { background: 'rgba(108,99,255,0.4)', color: '#fff' } }}>
                             {loading ? <CircularProgress size={24} color="inherit" /> : "הירשם"}
                         </Button>
 
@@ -452,7 +455,10 @@ const AuthModal = ({ open, onClose, onLoginSuccess }) => {
                                 הקוד תקף ל-5 דקות
                             </Typography>
                         )}
-                        <Button variant="contained" fullWidth sx={{ mt: 2 }}
+                        <Button variant="contained" fullWidth sx={{ mt: 2,
+                                background: 'linear-gradient(135deg,#6c63ff,#a78bfa)', boxShadow: 'none',
+                                '&:hover': { boxShadow: '0 4px 14px rgba(108,99,255,0.35)' },
+                                '&.Mui-disabled': { background: 'rgba(108,99,255,0.4)', color: '#fff' } }}
                             disabled={otp.join("").length !== 6 || loading}
                             onClick={handleVerifyOtp}>
                             {loading ? <CircularProgress size={24} color="inherit" /> : "אמת/י קוד"}

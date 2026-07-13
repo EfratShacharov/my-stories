@@ -22,7 +22,7 @@ Deno.serve(async (req: Request) => {
   const SUPABASE_URL = Deno.env.get("MY_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("MY_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const EMAILJS_SERVICE_ID = Deno.env.get("EMAILJS_SERVICE_ID");
-  const EMAILJS_TEMPLATE_ID = Deno.env.get("EMAILJS_TEMPLATE_ID");
+  const EMAILJS_TEMPLATE_ID = Deno.env.get("EMAILJS_NOTIFY_TEMPLATE_ID");
   const EMAILJS_PUBLIC_KEY = Deno.env.get("EMAILJS_PUBLIC_KEY") ?? Deno.env.get("EMAILJS_USER_ID");
   const EMAILJS_PRIVATE_KEY = Deno.env.get("EMAILJS_PRIVATE_KEY") ?? Deno.env.get("EMAILJS_ACCESS_TOKEN");
   const SEND_EMAILS = Deno.env.get("SEND_EMAILS") === "true";

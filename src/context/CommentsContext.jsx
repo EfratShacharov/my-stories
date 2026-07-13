@@ -18,23 +18,16 @@ export const CommentsProvider = ({ children }) => {
     useEffect(() => {
         fetchComments();
 
-        const subscription = supabase
-            .channel("comments-changes")
+        const channel = supabase
+            .channel("comments")
             .on(
                 "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: "comments"
-                },
-                (payload) => {
-                    console.log("Realtime event:", payload);
-                    fetchComments();
-                }
+                { event: "*", schema: "public", table: "comments" },
+                () => fetchComments()
             )
             .subscribe();
 
-        return () => supabase.removeChannel(subscription);
+        return () => supabase.removeChannel(channel);
     }, []);
 
     const addComment = async (name, storyId, subject, text, email, isAdmin = false, parentId = null, userId = null, emailUpdates = false) => {
@@ -67,18 +60,13 @@ export const CommentsProvider = ({ children }) => {
             email_updates: emailUpdates,
         };
 
-        console.log("newComment:", newComment);
-
         const { data, error } = await supabase
             .from("comments")
             .insert([newComment])
             .select("id")
             .maybeSingle();
 
-        if (error) {
-            console.error("INSERT ERROR:", error);
-            return null;
-        }
+        if (error) return null;
 
         return data?.id || null;
     };

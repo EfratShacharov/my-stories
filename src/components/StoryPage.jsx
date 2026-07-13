@@ -1,4 +1,4 @@
-import { Box, Button, CircularProgress, Divider, IconButton, TextField, Tooltip, Typography, useMediaQuery, useTheme } from '@mui/material';
+import { Box, Button, Checkbox, CircularProgress, Divider, FormControlLabel, IconButton, TextField, Tooltip, Typography, useMediaQuery, useTheme } from '@mui/material';
 import mammoth from "mammoth";
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -22,13 +22,16 @@ const StoryPage = ({ session, isAdmin }) => {
     }
     loadStory();
   }, [id]);
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const { addComment } = useComments();
+  const { addComment, notifyReply } = useComments();
   const [form, setForm] = useState({ name: "", email: "", comment: "" });
   const [errors, setErrors] = useState({ name: false, email: false, comment: false });
+  const [emailUpdates, setEmailUpdates] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -37,7 +40,6 @@ const StoryPage = ({ session, isAdmin }) => {
   const contentRef = useRef(null);
   const progressBarRef = useRef(null);
 
-  // remove the full-page vertical scrollbar
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
@@ -71,7 +73,6 @@ const StoryPage = ({ session, isAdmin }) => {
     const el = contentRef.current;
     if (!bar || !el) return;
     const rect = bar.getBoundingClientRect();
-    // direction: ltr on the bar, right side = start of story (0%), left side = end (100%)
     const clickX = e.clientX - rect.left;
     const fraction = 1 - (clickX / rect.width);
     const target = fraction * (el.scrollHeight - el.clientHeight);
@@ -94,8 +95,19 @@ const StoryPage = ({ session, isAdmin }) => {
     setErrors(newErrors);
     if (Object.values(newErrors).some(Boolean)) return;
 
-    await addComment(form.name, story.id, story.title, form.comment, form.email, false, null, session?.user?.id || null);
+    setSubmitting(true);
+    const insertedCommentId = await addComment(
+      form.name, story.id, story.title, form.comment, form.email,
+      false, null, session?.user?.id || null, emailUpdates
+    );
+
+    if (insertedCommentId) {
+      await notifyReply(insertedCommentId);
+    }
+
+    setSubmitting(false);
     setForm({ name: "", email: "", comment: "" });
+    setEmailUpdates(false);
     setErrors({ name: false, email: false, comment: false });
     setSuccessMessage("התגובה שלך נשלחה וממתינה לאישור!");
     setTimeout(() => setSuccessMessage(""), 3000);
@@ -154,8 +166,6 @@ const StoryPage = ({ session, isAdmin }) => {
         </Tooltip>
       </Box>
 
-      {/* progress bar — removed from here, now lives inside the story column */}
-
       {loading && (
         <Box sx={{ display: "flex", justifyContent: "center", mt: 6 }}>
           <CircularProgress />
@@ -203,6 +213,7 @@ const StoryPage = ({ session, isAdmin }) => {
                   onChange={handleInputChange("name")}
                   error={errors.name}
                   helperText={errors.name ? "אנא הזן שם" : ""}
+                  inputProps={{ style: { textAlign: 'right' } }}
                 />
                 <TextField
                   label="מייל *" fullWidth size="small" sx={{ mb: 2 }}
@@ -215,6 +226,7 @@ const StoryPage = ({ session, isAdmin }) => {
                   }}
                   error={errors.email}
                   helperText={errors.email ? "אנא הזן כתובת מייל תקינה" : ""}
+                  inputProps={{ style: { direction: 'ltr', textAlign: 'left' } }}
                 />
               </>
             )}
@@ -225,16 +237,38 @@ const StoryPage = ({ session, isAdmin }) => {
               onChange={handleInputChange("comment")}
               error={errors.comment}
               helperText={errors.comment ? "אנא הזן תוכן תגובה" : ""}
+              inputProps={{ style: { textAlign: 'right', direction: 'rtl' } }}
+            />
+
+            <FormControlLabel
+              sx={{ mb: 2, width: '100%', mr: 0 }}
+              control={
+                <Checkbox
+                  checked={emailUpdates}
+                  onChange={(e) => setEmailUpdates(e.target.checked)}
+                  size="small"
+                  sx={{ color: '#6c63ff', '&.Mui-checked': { color: '#6c63ff' } }}
+                />
+              }
+              label={<Typography variant="caption" color="text.secondary">שלחו לי עדכון במייל כאשר ישיבו לתגובה שלי</Typography>}
             />
 
             {successMessage && (
-              <Typography color="success.main" variant="body2" sx={{ mb: 1, textAlign: "center" }}>
-                {successMessage}
+              <Typography color="success.main" variant="body2" sx={{ mb: 1, textAlign: "center", fontWeight: 600 }}>
+                ✓ {successMessage}
               </Typography>
             )}
 
-            <Button variant="contained" fullWidth onClick={handleSubmit}>
-              שלח תגובה
+            <Button
+              variant="contained" fullWidth onClick={handleSubmit} disabled={submitting}
+              startIcon={submitting ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : null}
+              sx={{
+                background: 'linear-gradient(135deg,#6c63ff,#a78bfa)', boxShadow: 'none',
+                '&:hover': { boxShadow: '0 4px 14px rgba(108,99,255,0.35)' },
+                '&.Mui-disabled': { background: 'rgba(108,99,255,0.4)', color: '#fff' }
+              }}
+            >
+              {submitting ? 'שולח...' : 'שלח תגובה'}
             </Button>
           </Box>
 
@@ -250,7 +284,6 @@ const StoryPage = ({ session, isAdmin }) => {
             flexDirection: "column",
             overflow: "hidden",
           }}>
-            {/* progress bar — scoped to story column, clickable, RTL */}
             <Box
               ref={progressBarRef}
               onClick={handleProgressBarClick}
