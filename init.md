@@ -18,14 +18,10 @@ my-stories/
 │   │   ├── Navbar.jsx         # ניווט עליון
 │   │   ├── AuthModal.jsx      # מודל התחברות / הרשמה / OTP
 │   ├── context/
-│   │   └── CommentsContext.jsx# Context גלובלי לתגובות + Realtime subscription + קריאה ל-edge function
+│   │   └── CommentsContext.jsx# Context גלובלי לתגובות + Realtime subscription + קריאה ל-edge functions
 │   ├── supabase.js            # אתחול Supabase client
 │   ├── App.js                 # נתב ראשי + ניהול session
 │   └── index.js               # נקודת כניסה
-├── supabase/
-│   └── functions/
-│       └── notify-reply/
-│           └── index.ts       # Edge Function לשליחת מייל למגיבי-על לאחר תשובה
 ├── .env                       # משתני סביבה לפרונטאנד
 ├── init.md                    # תיעוד הפרויקט
 └── package.json
@@ -41,14 +37,10 @@ my-stories/
 | React Router DOM | 7 | ניווט בין עמודים |
 | MUI (Material UI) | 7 | רכיבי UI |
 | @mui/icons-material | 7 | אייקונים (CreateIcon, AutoStoriesIcon, DownloadIcon, ArrowForwardIcon וכו') |
-| @chakra-ui/react | 3 | רכיבי UI נוספים |
 | Emotion | 11 | CSS-in-JS |
 | stylis-plugin-rtl | 2 | תמיכה גלובלית בכיוון RTL |
-| Supabase JS | 2 | Backend: auth + database + storage + Realtime |
-| EmailJS | 3 | שליחת OTP + התראות למייל על תגובות |
+| Supabase JS | 2 | Backend: auth + database + storage + Realtime + Edge Functions |
 | mammoth | 1 | המרת קבצי DOCX לטקסט |
-| pdfjs-dist | 5 | קריאת PDFים בתוך האפליקציה |
-| firebase | 12 | שימושים נלווים/אופציונליים |
 | framer-motion | 12 | אנימציות |
 
 ---
@@ -95,8 +87,8 @@ CREATE POLICY "admin can delete stories" ON stories FOR DELETE TO authenticated 
 | `insert` | CommentsContext.addComment | הוספת תגובה חדשה; מחזיר את `id` החדש |
 | `update { status }` | CommentsManager.updateStatus | אישור / דחיית תגובה |
 | `insert` (is_admin: true, status: approved) | CommentsManager.sendReply | תגובת מנהל |
-| `notifyReply(commentId)` | CommentsContext + CommentPage + CommentsManager | לאחר תגובה משורשרת, מופעל edge function `notify-reply` |
-| `POST /functions/v1/notify-reply` | Supabase Edge Function | שולח מייל למי שבחר באפשרות עדכונים, אם יש תשובה להורה |
+| `notifyReply(commentId)` | CommentsContext + CommentPage + CommentsManager + StoryPage | לאחר תגובה, מופעל edge function `notify-reply` |
+| `POST /functions/v1/notify-reply` | Supabase Edge Function | שולח מייל למי שבחר באפשרות עדכונים |
 | Realtime `postgres_changes *` | CommentsContext useEffect | עדכון אוטומטי בכל שינוי |
 
 **מבנה רשומת comment:**
@@ -123,9 +115,14 @@ CREATE POLICY "admin can delete stories" ON stories FOR DELETE TO authenticated 
 
 ### הודעות מייל על תגובות
 - כאשר מגיב/ה משיב/ה לתגובה קיימת, ה-frontend מקים את התגובה ומעביר את ה-`id` ל-`notifyReply`.
-- ה-Edge Function `supabase/functions/notify-reply/index.ts` בודק אם לתגובה ההורה יש `email_updates = true`, אם יש כתובת מייל, ואם לא מדובר באותו אדם.
-- אם התנאים מתקיימים, הוא שולח מייל דרך EmailJS עם קישור חזרה אל התגובה/תגובה-האב.
-- ההפעלה מתבצעת גם מ-CommentPage (תגובה של משתמש) וגם מ-CommentsManager (תגובה של מנהל).
+- ה-Edge Function `notify-reply` בודק אם לתגובה ההורה יש `email_updates = true`, אם יש כתובת מייל, ואם לא מדובר באותו אדם.
+- אם התנאים מתקיימים, הוא שולח מייל דרך EmailJS (server-side) עם קישור חזרה אל התגובה.
+- ההפעלה מתבצעת מ-CommentPage, CommentsManager, ו-StoryPage.
+
+### OTP למנהל
+- בעת התחברות עם מייל המנהל, נשלח קוד OTP דרך Edge Function `send-otp`
+- ה-Edge Function שולח מייל דרך EmailJS API עם הקוד, תוקף 5 דקות
+- הקוד נוצר ב-frontend ונשלח ל-Edge Function יחד עם המייל וזמן התפוגה
 
 ### טבלת `users`
 
@@ -149,7 +146,7 @@ CREATE POLICY "admin can delete stories" ON stories FOR DELETE TO authenticated 
 
 ```
 App.js
-├── CommentsProvider (Context – comments, addComment, fetchComments)
+├── CommentsProvider (Context – comments, addComment, fetchComments, notifyReply)
 ├── Navbar (isAdmin, session, userName)
 └── Routes
     ├── /                → Home (session, isAdmin)
@@ -196,11 +193,16 @@ App.js
 - מרכז: כותרת הסיפור
 - ימין: כפתור חזרה לדף הבית (`ArrowForwardIcon`)
 
+### טופס תגובה
+- שדות שם + מייל (לאורחים בלבד) עם `inputProps` לכיוון נכון
+- צ'קבוקס `emailUpdates` — "שלחו לי עדכון במייל כאשר ישיבו לתגובה שלי"
+- כפתור שליחה בגרדיאנט סגול עם `submitting` state וספינר
+- לאחר שליחה — `notifyReply` נקרא עם ה-`id` של התגובה החדשה
+
 ### עיצוב טקסט הסיפור
-- שורות רגילות (עברית + מספרים + פיסוק): `lineHeight: 1.75`, `textAlign: right`, `direction: rtl`, `ml: auto`, `maxWidth: 65ch`
-- שורות עם סימנים מיוחדים (לא עברית/מספרים/פיסוק): `textAlign: center`
-- שורה ריקה = מעבר פסקה (`height: 1.2em`)
-- `isSpecialLine` — בודק אם השורה מכילה תווים שאינם: עברית, ספרות, `,`, `.`, `!`, `?`, `'`, `"`, `(`, `)`, `-`
+- שורות רגילות (עברית + מספרים + פיסוק): `lineHeight: 1.75`, `textAlign: right`, `direction: rtl`
+- שורות עם סימנים מיוחדים: `textAlign: center`
+- שורה ריקה = מעבר פסקה (`height: 0.6em`)
 
 ### progress bar
 - ממוקם בתוך עמודת הסיפור בלבד
@@ -234,9 +236,10 @@ const fraction = 1 - (clickX / rect.width);
 ## ניהול תגובות
 
 ### CommentPage (ציבורי)
+- כפתור "הוספת תגובה משלך" נדבק למעלה (`position: sticky`) בזמן גלילה
+- הטופס מוצג מעל רשימת התגובות
 - מוצגות רק תגובות ראשיות `approved` עם `parent_id = null`
 - רשימת סיפורים לטופס נטענת מ-Supabase (`storiesList`)
-- טופס נפתח/נסגר עם כפתור "הוספת תגובה משלך" / "סגור טופס תגובה"
 - בחירת נושא דרך `Autocomplete`: "תגובה על סיפור" או "אחר"
   - "תגובה על סיפור" — מציג `Autocomplete` נוסף לבחירת סיפור
   - "אחר" — מציג שדה טקסט חופשי לנושא
@@ -244,7 +247,7 @@ const fraction = 1 - (clickX / rect.width);
 - ממוינות כרונולוגית (ישן לחדש)
 - כפתור "השיבו" מוצג בתחתית התגובה, לחיצה גוללת לטופס ומציגה "משיב/ה לתגובה של [שם]"
 - בעת השבה — שדות נושא מוסתרים, מוצג שם הנמען עם כפתור ביטול
-- צ'קבוקס "שלחו לי עדכון במייל" בטופס הראשי ובטופס תגובה לתגובה
+- צ'קבוקס "שלחו לי עדכון במייל" בטופס
 - ליד שדה המייל: "המייל לא יוצג באתר"
 - ספינר + כיבוי כפתור בזמן שליחה
 - הודעת הצלחה: "התגובה תפורסם לאחר אישור מנהל האתר"
@@ -261,8 +264,8 @@ const fraction = 1 - (clickX / rect.width);
 
 | סוג | אווטאר | צבע רקע | תגית |
 |---|---|---|---|
-| משתמש (ראשי/משורשר) | CreateIcon כחול | לבן | — |
-| מנהל משורשר | AutoStoriesIcon כתום | #fff8f0 | badge כתום "מנהלת" |
+| משתמש (ראשי/משורשר) | CreateIcon סגול | לבן | — |
+| מנהל משורשר | AutoStoriesIcon כתום | #fffbf0 | badge כתום "מנהלת" |
 
 ### CommentsManager (מנהל)
 - עיצוב זהה ל-CommentPage
@@ -282,7 +285,6 @@ const fraction = 1 - (clickX / rect.width);
 - חלוקה לפסקאות עם כותרת (`subtitle1`) בצבע primary
 - ציטוט פותח עם קו צד (`borderRight`) ורקע עדין
 - RTL: `direction: rtl` ב-`sx`, `textAlign: right` + `unicodeBidi: plaintext` ב-inline `style` (עקיפת stylis-plugin-rtl)
-- נגיש לכולם דרך `/about`, קישור בניווט
 
 ---
 
@@ -302,7 +304,6 @@ const fraction = 1 - (clickX / rect.width);
 - דיאלוג הוספה/עריכה עם 4 שדות: בחירת סיפור (dropdown), ציטוט, תוכן (8 שורות), תאריך
 - בחירת סיפור ממלאת `story_title` אוטומטית
 - גלילה ללא scrollbar (מוסתר דרך `useEffect` שמוסיף `<style>` זמני)
-- קישור בניווט למנהל בלבד
 
 ### טבלת `behind_the_scenes`
 
@@ -351,9 +352,22 @@ ALTER TABLE behind_the_scenes ENABLE ROW LEVEL SECURITY;
 - Chip PDF (כתום-אדום) — לחיצה פותחת ישירות בדפדפן
 - כפתורי עריכה/מחיקה (`EditIcon` / `DeleteIcon`)
 - דיאלוג הוספה/עריכה: שדה כותרת + העלאת DOCX + העלאת PDF
-- שדה "שם תצוגה" הוסר
 - Realtime subscription על טבלת `stories` — רשימת הסיפורים מתעדכנת אוטומטית בכל שינוי
 - **חשוב:** יש להפעיל Realtime על טבלת `stories` ב-Supabase Dashboard תחת **Database → Replication**
+
+---
+
+## Edge Functions (Supabase)
+
+### `notify-reply`
+- מופעל לאחר הוספת תגובה משורשרת
+- בודק אם לתגובה ההורה יש `email_updates = true` וכתובת מייל
+- שולח מייל דרך EmailJS API (server-side)
+
+### `send-otp`
+- מופעל בעת התחברות מנהל
+- מקבל `{ email, otpCode, expireTime }`
+- שולח מייל OTP דרך EmailJS API עם template נפרד (`EMAILJS_OTP_TEMPLATE_ID`)
 
 ---
 
@@ -375,10 +389,9 @@ REACT_APP_ADMIN_PASSWORD=
 MY_SUPABASE_URL=
 MY_SERVICE_ROLE_KEY=
 EMAILJS_SERVICE_ID=
-EMAILJS_TEMPLATE_ID=
+EMAILJS_TEMPLATE_ID=          # לשליחת notify-reply
+EMAILJS_OTP_TEMPLATE_ID=      # לשליחת OTP למנהל
 EMAILJS_PUBLIC_KEY=
 EMAILJS_PRIVATE_KEY=
-SITE_URL=http://localhost:3000   # או domen מלא ב-production
+SITE_URL=http://localhost:3000   # או דומיין מלא ב-production
 ```
-
-> `EMAILJS_PRIVATE_KEY` נקרא גם `accessToken` בחשבון EmailJS; יש לוודא שה-EmailJS account מאפשר שימוש שרת-סייד/Server-side API. 
