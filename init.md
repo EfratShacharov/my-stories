@@ -15,8 +15,9 @@ my-stories/
 │   │   ├── About.jsx          # דף אודות — טקסט סטטי, חלוקה לפסקאות עם כותרות
 │   │   ├── BehindTheScenes.jsx# דף ציבורי — מאחורי הקלעים לפי story_id, רקע כהה
 │   │   ├── BehindManager.jsx  # ניהול מאחורי הקלעים (מנהל בלבד) — CRUD מול Supabase
-│   │   ├── Navbar.jsx         # ניווט עליון
+│   │   ├── Navbar.jsx         # ניווט עליון + dropdown menu פרופיל
 │   │   ├── AuthModal.jsx      # מודל התחברות / הרשמה / OTP
+│   │   ├── UserProfile.jsx    # עמוד פרופיל משתמש עם 5 tabs
 │   ├── context/
 │   │   └── CommentsContext.jsx# Context גלובלי לתגובות + Realtime subscription + קריאה ל-edge functions
 │   ├── supabase.js            # אתחול Supabase client
@@ -131,11 +132,25 @@ CREATE POLICY "admin can delete stories" ON stories FOR DELETE TO authenticated 
 | `select name, is_admin` | App.js.loadUserData | קריאת פרטי משתמש לאחר login |
 | `select name, email` | CommentsContext.addComment | שליפת פרטי משתמש מחובר |
 | `select name` | CommentsManager (useEffect) | שליפת שם המנהל המחובר |
+| `select name, email, email_updates` | UserProfile (useEffect) | טעינת פרטי פרופיל |
+| `update { name }` | UserProfile.saveName | עדכון שם + קריאה ל-`onNameChange` לסנכרון מיידי ב-Navbar |
+| `update { email_updates }` | UserProfile.saveSettings | עדכון הגדרת עדכוני מייל |
 | `insert` | AuthModal.handleRegister | יצירת משתמש חדש |
 
 **מבנה רשומת user:**
 ```js
 { id, name, email, email_updates, is_admin }
+```
+
+### טבלת `story_likes`
+
+| פעולה | מתבצע ב | תיאור |
+|---|---|---|
+| `select stories(id,title) where user_identifier = uid` | UserProfile (useEffect) | שליפת סיפורים שהמשתמש אהב |
+
+**מבנה רשומת story_like:**
+```js
+{ story_id, user_identifier }
 ```
 
 ---
@@ -147,7 +162,7 @@ CREATE POLICY "admin can delete stories" ON stories FOR DELETE TO authenticated 
 ```
 App.js
 ├── CommentsProvider (Context – comments, addComment, fetchComments, notifyReply)
-├── Navbar (isAdmin, session, userName)
+├── Navbar (isAdmin, session, userName, userEmail, onAuthClick, onLogout)
 └── Routes
     ├── /                → Home (session, isAdmin)
     ├── /story/:id       → StoryPage (session, isAdmin)
@@ -156,12 +171,15 @@ App.js
     ├── /behind/:id      → BehindTheScenes
     ├── /files           → FileManager (מנהל בלבד)
     ├── /manage-comments → CommentsManager (מנהל בלבד)
-    └── /manage-behind   → BehindManager (מנהל בלבד)
+    ├── /manage-behind   → BehindManager (מנהל בלבד)
+    ├── /profile/:tab    → UserProfile (session, onNameChange) — מנותב לפי tab
+    └── /profile         → UserProfile (session, onNameChange) — ברירת מחדל: tab=account
 ```
 
 ### ניהול מצב
 
-- **session / isAdmin / userName** – מנוהל ב-`App.js`, מועבר כ-props ל-Home, StoryPage, CommentPage
+- **session / isAdmin / userName / userEmail** – מנוהל ב-`App.js`, מועבר כ-props ל-Navbar ולקומפוננטים
+- **userEmail** – נשלף דרך `supabase.auth.getUser()` בתוך `loadUserData`, מועבר ל-Navbar להצגה ב-dropdown
 - **comments** – מנוהל ב-`CommentsContext`:
   - נטען פעם אחת עם `fetchComments` ב-useEffect
   - מתעדכן אוטומטית דרך **Supabase Realtime** על כל שינוי בטבלת `comments`
@@ -173,8 +191,76 @@ App.js
 | משתמש | יכולות |
 |---|---|
 | אורח | קריאת סיפורים, הגשת תגובה עם שם + מייל ידני |
-| משתמש מחובר | הגשת תגובה (שם ומייל נלקחים מה-DB, שדות מוסתרים) |
+| משתמש מחובר | הגשת תגובה (שם ומייל נלקחים מה-DB, שדות מוסתרים) + גישה לעמוד פרופיל |
 | מנהל | הכל + אישור/דחייה/תשובה לתגובות + ניהול סיפורים + ניהול מאחורי הקלעים |
+
+---
+
+## Navbar
+
+### Props
+`isAdmin, session, userName, userEmail, onAuthClick, onLogout`
+
+### Desktop
+- שם המשתמש מוצג כ-Button בצד שמאל של ה-Toolbar
+- לחיצה פותחת **dropdown Menu** עם:
+  - header: שם + מייל
+  - 5 פריטי ניווט לפרופיל (`PROFILE_ITEMS`)
+  - Divider + כפתור התנתקות בתחתית
+- אין כפתור logout נפרד ב-Toolbar
+
+### Mobile (Drawer)
+- פריטי ניווט רגילים + Divider + שם המשתמש + 5 פריטי פרופיל בתוך ה-Drawer
+- לחיצה על פריט פרופיל מנווטת ל-`/profile/:tab` וסוגרת את ה-Drawer
+
+### PROFILE_ITEMS
+```js
+[
+  { label: 'פרטים אישיים',   tab: 'account',       icon: <PersonIcon /> },
+  { label: 'סיפורים שאהבתי', tab: 'likes',          icon: <FavoriteIcon /> },
+  { label: 'התגובות שלי',    tab: 'comments',       icon: <ChatBubbleOutlineIcon /> },
+  { label: 'התראות',         tab: 'notifications',  icon: <NotificationsNoneIcon /> },
+  { label: 'הגדרות',         tab: 'settings',       icon: <SettingsIcon /> },
+]
+```
+
+---
+
+## עמוד UserProfile (`/profile/:tab`)
+
+### Props
+`session, onNameChange`
+
+### מבנה
+- דף מלא עם רקע `#f5ede3`
+- **sticky nav header** מתחת ל-Navbar הראשי — 5 tabs עם אייקון מעל טקסט
+- סדר tabs: `flexDirection: row-reverse` כדי ש"פרטים אישיים" יהיה בצד ימין (RTL)
+- תוכן ב-Container מרכזי עם כרטיס לבן
+
+### Tabs
+| id | תווית | תוכן |
+|---|---|---|
+| `account` | פרטים אישיים | עדכון שם / מייל / סיסמה |
+| `likes` | סיפורים שאהבתי | רשימת סיפורים שאהב המשתמש עם קישור לקריאה |
+| `comments` | התגובות שלי | תגובות ראשיות של המשתמש עם קישור לסיפור |
+| `notifications` | התראות | רשימת התראות (ריקה כרגע) |
+| `settings` | הגדרות | toggle לעדכוני מייל |
+
+### הודעות — קומפוננט `Msg`
+- מחליף את MUI Alert
+- צבע הצלחה: `#c8860a` (זהב) עם רקע `rgba(200,134,10,0.10)`
+- צבע שגיאה: `#5c3a1e` (חום כהה) עם רקע `rgba(92,58,30,0.08)`
+- נעלם אוטומטית אחרי 3.5 שניות
+
+### סנכרון שם
+- אחרי `saveName` — `onNameChange(newName)` מעדכן את `userName` ב-App.js ומיד ב-Navbar
+
+### קריאות Supabase
+- `users`: `select name, email, email_updates`
+- `story_likes`: `select stories(id,title)` לפי `user_identifier`
+- `comments`: `select id,comment,story_title,created_at,status,story_id` לפי `name` + `is_admin=false` + `parent_id=null`
+- `supabase.auth.updateUser({ email })` — עדכון מייל (שולח מייל אימות)
+- `supabase.auth.updateUser({ password })` — עדכון סיסמה
 
 ---
 
