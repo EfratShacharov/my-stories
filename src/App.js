@@ -16,7 +16,7 @@ import About from './components/About';
 import BehindTheScenes from './components/BehindTheScenes';
 import BehindManager from './components/BehindManager';
 import AuthModal from './components/AuthModal';
-
+import UserProfile from './components/UserProfile';
 import './index.css';
 import { CommentsProvider } from './context/CommentsContext';
 import { supabase } from './supabase';
@@ -66,6 +66,7 @@ function App() {
   const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(true);
   const [showUser, setShowUser] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
 
   const loadUserData = async (userId) => {
     if (!userId) {
@@ -82,6 +83,7 @@ function App() {
 
     setUserName(data?.name || "");
     setIsAdmin(data?.is_admin === true);
+    setUserEmail(userId ? (await supabase.auth.getUser()).data?.user?.email || "" : "");
   };
 
   useEffect(() => {
@@ -99,7 +101,6 @@ function App() {
       (_event, session) => {
         setSession(session);
         if (!session) {
-          // התנתקות
           setUserName("");
           setIsAdmin(false);
           setShowUser(false);
@@ -122,6 +123,7 @@ function App() {
               isAdmin={isAdmin}
               session={showUser ? session : null}
               userName={userName}
+              userEmail={userEmail}
               onAuthClick={() => setAuthOpen(true)}
               onLogout={async () => {
                 await supabase.auth.signOut();
@@ -159,7 +161,6 @@ function App() {
                   path="/files"
                   element={isAdmin ? <FileManager /> : <Home />}
                 />
-
                 <Route
                   path="/manage-comments"
                   element={isAdmin ? <CommentsManager /> : <Home />}
@@ -167,6 +168,8 @@ function App() {
                 <Route path="/about" element={<About />} />
                 <Route path="/behind/:id" element={<BehindTheScenes />} />
                 <Route path="/manage-behind" element={isAdmin ? <BehindManager /> : <Home />} />
+                <Route path="/profile/:tab" element={session ? <UserProfile session={session} onNameChange={(n) => setUserName(n)} /> : <Home />} />
+                <Route path="/profile" element={session ? <UserProfile session={session} onNameChange={(n) => setUserName(n)} /> : <Home />} />
               </Routes>
             </div>
 
