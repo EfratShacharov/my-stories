@@ -1,5 +1,4 @@
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import { AppBar, Box, Drawer, IconButton, List, ListItemButton, ListItemText, Tooltip, Typography, useMediaQuery, useTheme } from '@mui/material';
@@ -34,9 +33,9 @@ const Navbar = ({ isAdmin, session, userName, onAuthClick, onLogout }) => {
   return (
     <AppBar position="fixed" elevation={0} sx={{
       top: 0,
-      bgcolor: 'rgba(255,255,255,0.85)',
+      bgcolor: 'rgba(245,237,227,0.92)',
       backdropFilter: 'blur(12px)',
-      borderBottom: '1px solid rgba(108,99,255,0.1)',
+      borderBottom: '1px solid rgba(200,134,10,0.15)',
       color: 'text.primary',
     }}>
       <Toolbar style={{ justifyContent: 'space-between' }}>
@@ -45,7 +44,7 @@ const Navbar = ({ isAdmin, session, userName, onAuthClick, onLogout }) => {
         {session ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Tooltip title="התנתקות" arrow>
-              <IconButton onClick={handlrLogout} sx={{ color: '#6c63ff' }}>
+              <IconButton onClick={handlrLogout} sx={{ color: '#c8860a' }}>
                 <LogoutIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -57,7 +56,7 @@ const Navbar = ({ isAdmin, session, userName, onAuthClick, onLogout }) => {
           </Box>
         ) : (
           <Tooltip title="כניסה" arrow>
-            <IconButton onClick={onAuthClick} sx={{ color: '#6c63ff' }}>
+            <IconButton onClick={onAuthClick} sx={{ color: '#c8860a' }}>
               <AccountCircleIcon />
             </IconButton>
           </Tooltip>
@@ -66,22 +65,21 @@ const Navbar = ({ isAdmin, session, userName, onAuthClick, onLogout }) => {
         {/* צד ימין — לוגו + ניווט */}
         {isMobile ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AutoStoriesIcon sx={{ color: '#6c63ff', fontSize: 22 }} />
-            <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: '#6c63ff' }}>
+            <Box component="img" src="/logo.png" alt="אפיזודה" sx={{ height: 36 }} />
+            <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: '#c8860a' }}>
               <MenuIcon />
             </IconButton>
             <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}
-              PaperProps={{ sx: { width: 220, bgcolor: '#fafafa' } }}>
-              <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid #eee' }}>
-                <AutoStoriesIcon sx={{ color: '#6c63ff' }} />
-                <Typography fontWeight={700} sx={{ color: '#1a1a2e' }}>הסיפורים שלי</Typography>
+              PaperProps={{ sx: { width: 220, bgcolor: '#fffaf5' } }}>
+              <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid rgba(200,134,10,0.15)' }}>
+                <Box component="img" src="/logo.png" alt="אפיזודה" sx={{ height: 32 }} />
               </Box>
               <List sx={{ pt: 1 }} dir="rtl">
                 {navLinks.map(link => (
                   <ListItemButton key={link.to} component={Link} to={link.to}
                     onClick={() => setDrawerOpen(false)}
                     selected={location.pathname === link.to}
-                    sx={{ borderRadius: 2, mx: 1, mb: 0.5, '&.Mui-selected': { bgcolor: 'rgba(108,99,255,0.08)', color: '#6c63ff' } }}>
+                    sx={{ borderRadius: 2, mx: 1, mb: 0.5, '&.Mui-selected': { bgcolor: 'rgba(200,134,10,0.10)', color: '#c8860a' } }}>
                     <ListItemText primary={link.label} primaryTypographyProps={{ fontSize: 14, fontWeight: 500 }} />
                   </ListItemButton>
                 ))}
@@ -95,19 +93,19 @@ const Navbar = ({ isAdmin, session, userName, onAuthClick, onLogout }) => {
           </Box>
         ) : (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <AutoStoriesIcon sx={{ color: '#6c63ff', fontSize: 22, ml: 1 }} />
+            <Box component="img" src="/logo.png" alt="אפיזודה" sx={{ height: 40, ml: 1 }} />
             {navLinks.map(link => {
               const active = location.pathname === link.to;
               return (
                 <Button key={link.to} component={Link} to={link.to}
                   sx={{
-                    color: active ? '#6c63ff' : '#4b5563',
+                    color: active ? '#c8860a' : '#5c3a1e',
                     fontWeight: active ? 700 : 500,
                     fontSize: 13,
                     px: 1.5,
-                    borderBottom: active ? '2px solid #6c63ff' : '2px solid transparent',
+                    borderBottom: active ? '2px solid #c8860a' : '2px solid transparent',
                     borderRadius: 0,
-                    '&:hover': { color: '#6c63ff', bgcolor: 'transparent' },
+                    '&:hover': { color: '#c8860a', bgcolor: 'transparent' },
                   }}>
                   {link.label}
                 </Button>

@@ -17,11 +17,8 @@ const BehindTheScenes = () => {
 
   useEffect(() => {
     async function load() {
-      const { data, error } = await supabase
-        .from('behind_the_scenes')
-        .select('*')
-        .eq('story_id', parseInt(id, 10))
-        .maybeSingle();
+      const { data, error } = await supabase.from('behind_the_scenes').select('*')
+        .eq('story_id', parseInt(id, 10)).maybeSingle();
       if (!error) setData(data);
       setLoading(false);
     }
@@ -30,73 +27,63 @@ const BehindTheScenes = () => {
 
   if (loading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}>
-      <CircularProgress />
+      <CircularProgress sx={{ color: '#c8860a' }} />
     </Box>
   );
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#0d0d0d', pt: '64px' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f5ede3', pt: '64px' }}>
       <Container maxWidth="sm" sx={{ py: 5 }}>
 
-        {/* כפתור חזרה */}
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
           <Tooltip title={backTo === '/manage-behind' ? 'חזור לניהול' : 'חזור לדף הבית'}>
-            <IconButton component={Link} to={backTo} sx={{ color: '#aaa' }}>
+            <IconButton component={Link} to={backTo} sx={{ color: '#7a5c3a' }}>
               <ArrowForwardIcon />
             </IconButton>
           </Tooltip>
         </Box>
 
-        {/* כותרת */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5, mb: 1 }}>
-          <Typography variant="h4" sx={{ fontWeight: 800, color: '#fff', ...rtlSx }} style={rtlStyle}>
+          <Typography variant="h4" sx={{ fontWeight: 800, color: '#3b2008', ...rtlSx }} style={rtlStyle}>
             {data?.story_title || 'מאחורי הקלעים'}
           </Typography>
-          <TheaterComedyIcon sx={{ fontSize: 38, color: '#f0a500' }} />
+          <TheaterComedyIcon sx={{ fontSize: 38, color: '#c8860a' }} />
         </Box>
 
-        <Typography variant="body2" sx={{ color: '#888', mb: 4, ...rtlSx }} style={rtlStyle}>
+        <Typography variant="body2" sx={{ color: '#7a5c3a', mb: 4, ...rtlSx }} style={rtlStyle}>
           הסיפור שמאחורי הסיפור
         </Typography>
 
-        <Divider sx={{ borderColor: '#333', mb: 4 }} />
+        <Divider sx={{ borderColor: 'rgba(200,134,10,0.25)', mb: 4 }} />
 
         {!data ? (
-          <Typography sx={{ color: '#888', ...rtlSx }} style={rtlStyle}>
-            תוכן בקרוב...
-          </Typography>
+          <Typography sx={{ color: '#7a5c3a', ...rtlSx }} style={rtlStyle}>תוכן בקרוב...</Typography>
         ) : (
           <>
-            {/* ציטוט / כותרת משנה */}
             {data.tagline && (
               <Box sx={{
-                borderRight: '3px solid #f0a500',
-                pr: 2, py: 1, mb: 4,
-                bgcolor: 'rgba(240,165,0,0.07)',
-                borderRadius: '0 8px 8px 0',
-                ...rtlSx
+                borderRight: '3px solid #c8860a', pr: 2, py: 1, mb: 4,
+                bgcolor: 'rgba(200,134,10,0.07)', borderRadius: '0 8px 8px 0', ...rtlSx
               }}>
-                <Typography variant="body1" sx={{ fontStyle: 'italic', color: '#f0c060', lineHeight: 2, ...rtlSx }} style={rtlStyle}>
+                <Typography variant="body1" sx={{ fontStyle: 'italic', color: '#a0622a', lineHeight: 2, ...rtlSx }} style={rtlStyle}>
                   {data.tagline}
                 </Typography>
               </Box>
             )}
 
-            {/* תוכן ראשי */}
             {data.content?.split('\n').map((line, i) => {
               if (!line.trim()) return <Box key={i} sx={{ height: '1em' }} />;
               return (
-                <Typography key={i} variant="body1" sx={{ color: '#ddd', lineHeight: 2.1, mb: 0.5, ...rtlSx }} style={rtlStyle}>
+                <Typography key={i} variant="body1" sx={{ color: '#3b2008', lineHeight: 2.1, mb: 0.5, ...rtlSx }} style={rtlStyle}>
                   {line}
                 </Typography>
               );
             })}
 
-            {/* תאריך כתיבה */}
             {data.written_at && (
               <>
-                <Divider sx={{ borderColor: '#333', mt: 4, mb: 2 }} />
-                <Typography variant="caption" sx={{ color: '#555', display: 'block', ...rtlSx }} style={rtlStyle}>
+                <Divider sx={{ borderColor: 'rgba(200,134,10,0.2)', mt: 4, mb: 2 }} />
+                <Typography variant="caption" sx={{ color: '#a0622a', display: 'block', ...rtlSx }} style={rtlStyle}>
                   נכתב: {new Date(data.written_at).toLocaleDateString('he-IL')}
                 </Typography>
               </>

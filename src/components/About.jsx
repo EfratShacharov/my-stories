@@ -8,42 +8,40 @@ const rtlStyle = { textAlign: 'right', unicodeBidi: 'plaintext' };
 const Section = ({ title, children }) => (
   <Box sx={{ mb: 4 }}>
     {title && (
-      <Typography variant="subtitle1" style={rtlStyle} sx={{ fontWeight: 700, color: 'primary.main', mb: 1, ...rtlSx }}>
+      <Typography variant="subtitle1" style={rtlStyle} sx={{ fontWeight: 700, color: '#c8860a', mb: 1, ...rtlSx }}>
         {title}
       </Typography>
     )}
-    <Typography variant="body1" style={rtlStyle} sx={{ lineHeight: 2, color: 'text.secondary', ...rtlSx }}>
+    <Typography variant="body1" style={rtlStyle} sx={{ lineHeight: 2, color: '#7a5c3a', ...rtlSx }}>
       {children}
     </Typography>
   </Box>
 );
 
 const About = () => (
-  <Box sx={{ bgcolor: '#f7f6fb', minHeight: '100vh', pt: { xs: 10, sm: 11 }, pb: 6 }}>
+  <Box sx={{ bgcolor: '#f5ede3', minHeight: '100vh', pt: { xs: 10, sm: 11 }, pb: 6 }}>
   <Container maxWidth="sm" sx={{ pb: 6 }}>
 
-    {/* כותרת */}
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5, mb: 1 }}>
-      <Typography variant="h4" sx={{ fontWeight: 800, color: '#1a1a2e' }}>אודות</Typography>
-      <AutoStoriesIcon sx={{ color: '#6c63ff', fontSize: 36 }} />
+      <Typography variant="h4" sx={{ fontWeight: 800, color: '#3b2008' }}>אודות</Typography>
+      <AutoStoriesIcon sx={{ color: '#c8860a', fontSize: 36 }} />
     </Box>
-    <Box sx={{ width: 48, height: 3, bgcolor: '#6c63ff', borderRadius: 2, mb: 3 }} style={{ marginRight: 0, marginLeft: 'auto' }} />
+    <Box sx={{ width: 48, height: 3, bgcolor: '#c8860a', borderRadius: 2, mb: 3 }} style={{ marginRight: 0, marginLeft: 'auto' }} />
 
-    {/* ציטוט פותח */}
     <Box sx={{
-      borderRight: '4px solid #6c63ff',
+      borderRight: '4px solid #c8860a',
       pr: 2, pl: 1, py: 1, mb: 4,
-      bgcolor: 'rgba(108,99,255,0.04)',
+      bgcolor: 'rgba(200,134,10,0.06)',
       borderRadius: '0 8px 8px 0',
       ...rtlSx
     }}>
-      <Typography variant="body1" style={rtlStyle} sx={{ fontStyle: 'italic', lineHeight: 2, ...rtlSx }}>
+      <Typography variant="body1" style={rtlStyle} sx={{ fontStyle: 'italic', lineHeight: 2, color: '#5c3a1e', ...rtlSx }}>
         האתר הזה נוצר בעקבות כמה טריגרים. בלי הדברים שקרו לי, יכול להיות שלא הייתם קוראים את השורות הללו.
         וגם אם הייתם מנסים, כתובת הקישור הזו פשוט לא הייתה קיימת.
       </Typography>
     </Box>
 
-    <Divider sx={{ mb: 4 }} />
+    <Divider sx={{ mb: 4, borderColor: 'rgba(200,134,10,0.2)' }} />
 
     <Section title="אז איך הכל התחיל?">
       יצאתי לעולם לאחר שסיימתי לימודי הנדסת תוכנה, מנסה את מזלי בשליחת קורות חיים עלובים שנולדו לקראת סיום הלימודים.
@@ -60,18 +58,14 @@ const About = () => (
       <br />
       מאז, שפת הכתיבה שלי התפתחה והפכה למשופשפת יותר. בגיל 19 התחלתי לכתוב ספר.
       הוא עדיין בכתיבה, אבל כבר מגיע לכ-20 פרקים וכ-125 עמודי A4.
-      {/* </Section> */}
       <br />
       <br />
-      {/* <Section title="המלחמה והפריצה"> */}
       כשפרצה המלחמה הארורה הפסקתי לכתוב. הרגש שלי כאילו נעצר, ולא הצלחתי להוציא אותו החוצה.
       כך עברו שישה חודשים — עד שהרגש פרץ החוצה ובבת אחת.
       ביום אחד נוצר הקטע הראשון שלי. ובעקבותיו, עוד ועוד.
-      {/* </Section> */}
       <br />
       <br />
       <br />
-      {/* <Section title="על האתר הזה"> */}
       כך נוצר האתר הזה. שילוב של שכל ורגש, ראליות עם הומניות.
       אני מקווה שתאהבו לא רק את הסיפורים שנכתבו בזמנים הזויים ובשעות שלא הייתם מעלים על דעתכם,
       אלא גם את האתר עצמו — שעד שהגיע למה שהוא היום לקח לו לא מעט זמן.
@@ -79,10 +73,9 @@ const About = () => (
       ועזר לו לקפוץ קדימה בצורה שלא דמיינתי.
     </Section>
 
-    <Divider sx={{ mb: 3 }} />
+    <Divider sx={{ mb: 3, borderColor: 'rgba(200,134,10,0.2)' }} />
 
-    {/* סיום */}
-    <Typography variant="body1" style={rtlStyle} sx={{ fontWeight: 600, lineHeight: 2, ...rtlSx }}>
+    <Typography variant="body1" style={rtlStyle} sx={{ fontWeight: 600, lineHeight: 2, color: '#3b2008', ...rtlSx }}>
       אז נשאר לי רק להגיד תודה לכל מי שפרגן, דחף, והאמין שהדבר הזה יגיע לאיפה שהוא נמצא היום. 🙏
     </Typography>
 
