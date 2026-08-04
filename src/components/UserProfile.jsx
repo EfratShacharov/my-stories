@@ -42,7 +42,7 @@ const Msg = ({ msg }) => !msg ? null : (
   </Box>
 );
 
-const UserProfile = ({ session, onNameChange }) => {
+const UserProfile = ({ session, onNameChange, onMarkRead }) => {
   const { tab = "account" } = useParams();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -81,16 +81,69 @@ const UserProfile = ({ session, onNameChange }) => {
             .order("created_at", { ascending: false })
         : { data: [] };
 
+      const rootIds = (userComments || []).map((c) => c.id);
+      const { data: replies } = rootIds.length
+        ? await supabase.from("comments")
+            .select("id,comment,name,created_at,status,is_admin,parent_id")
+            .in("parent_id", rootIds)
+            .order("created_at", { ascending: true })
+        : { data: [] };
+
+      const repliesMap = {};
+      (replies || []).forEach((r) => {
+        if (!r.is_admin && r.status !== "approved") return;
+        if (!repliesMap[r.parent_id]) repliesMap[r.parent_id] = [];
+        repliesMap[r.parent_id].push(r);
+      });
+
+      const commentsWithReplies = (userComments || []).map((c) => ({
+        ...c, replies: repliesMap[c.id] || [],
+      }));
+
       setUserData({ name, email });
       setNameForm(name);
       setEmailForm(email);
       setEmailUpdates(user?.email_updates ?? false);
       setLikedStories(likes?.map((l) => l.stories).filter(Boolean) || []);
-      setMyComments(userComments || []);
-      setNotifications([]);
+      setMyComments(commentsWithReplies);
+      const { data: notifs } = await supabase
+        .from("notifications")
+        .select("id,type,title,link,is_read,created_at")
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false });
+
+      setNotifications(notifs || []);
       setLoading(false);
     })();
   }, [session]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const uid = session.user.id;
+    const channel = supabase
+      .channel('user-notifications')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'notifications',
+        filter: `user_id=eq.${uid}`,
+      }, (payload) => {
+        setNotifications((prev) => [payload.new, ...prev]);
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'notifications',
+        filter: `user_id=eq.${uid}`,
+      }, (payload) => {
+        setNotifications((prev) =>
+          prev.map((n) => n.id === payload.new.id ? payload.new : n)
+        );
+      })
+      .on('postgres_changes', {
+        event: 'DELETE', schema: 'public', table: 'notifications',
+      }, (payload) => {
+        setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [session?.user?.id]);
 
   const setMsg = (key, text, isError = false) => {
     setMsgs((p) => ({ ...p, [key]: { text, isError } }));
@@ -139,8 +192,28 @@ const UserProfile = ({ session, onNameChange }) => {
     setSav("settings", false);
   };
 
+  const dismissNotification = async (id) => {
+    await supabase.from("notifications").delete().eq("id", id);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const markAllRead = async () => {
+    const unread = notifications.filter((n) => !n.is_read).map((n) => n.id);
+    if (!unread.length) return;
+    await supabase.from("notifications").update({ is_read: true }).in("id", unread);
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    onMarkRead?.();
+  };
+
+  useEffect(() => {
+    if (tab === 'notifications' && notifications.length) markAllRead();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, notifications.length]);
+
   const formatDate = (dt) =>
     new Date(dt).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const renderContent = () => {
     if (loading) return (
@@ -235,27 +308,50 @@ const UserProfile = ({ session, onNameChange }) => {
           <SectionTitle icon={<ChatBubbleOutlineIcon />} label="התגובות שלי" />
           {myComments.length === 0
             ? <Typography variant="body2" color="#7a5c3a">עדיין לא כתבת תגובות.</Typography>
-            : myComments.map((c) => (
-              <Box key={c.id} sx={{
-                py: 1.5, px: 2, mb: 1.5, borderRadius: 2,
-                bgcolor: "#fff8ee", border: "1px solid rgba(200,134,10,0.12)",
-              }}>
-                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-                  <Typography variant="caption" color="#7a5c3a">{formatDate(c.created_at)}</Typography>
-                  <Typography variant="caption" fontWeight={700} color="#c8860a">{c.story_title}</Typography>
-                </Box>
-                <Typography variant="body2" color="#3b2008" sx={{ lineHeight: 1.8 }}>{c.comment}</Typography>
-                {c.story_id && (
-                  <Box sx={{ mt: 1, textAlign: "left" }}>
-                    <Button component={Link} to={`/story/${c.story_id}`} size="small"
-                      sx={{ color: "#c8860a", p: 0, fontSize: 11,
-                        "&:hover": { bgcolor: "transparent", textDecoration: "underline" } }}>
-                      לסיפור
-                    </Button>
+            : myComments.map((c) => {
+              return (
+                <Box key={c.id} sx={{
+                  py: 1.5, px: 2, mb: 2, borderRadius: 2,
+                  bgcolor: "#fff8ee", border: "1px solid rgba(200,134,10,0.12)",
+                }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                    <Typography variant="caption" color="#7a5c3a">{formatDate(c.created_at)}</Typography>
+                    <Typography variant="caption" fontWeight={700} color="#c8860a">{c.story_title}</Typography>
                   </Box>
-                )}
-              </Box>
-            ))
+                  <Typography variant="body2" color="#3b2008" sx={{ lineHeight: 1.8 }}>{c.comment}</Typography>
+                  {c.story_id && (
+                    <Box sx={{ mt: 1, textAlign: "left" }}>
+                      <Button component={Link} to={`/story/${c.story_id}`} size="small"
+                        sx={{ color: "#c8860a", p: 0, fontSize: 11,
+                          "&:hover": { bgcolor: "transparent", textDecoration: "underline" } }}>
+                        לסיפור
+                      </Button>
+                    </Box>
+                  )}
+
+                  {c.replies.length > 0 && (
+                    <Box sx={{ mt: 1.5, borderTop: "1px solid rgba(200,134,10,0.12)", pt: 1.5 }}>
+                      {c.replies.map((r) => (
+                        <Box key={r.id} sx={{
+                          px: 1.5, py: 1, mb: 1, borderRadius: 1.5,
+                          bgcolor: r.is_admin ? "#fffbf0" : "#fff",
+                          border: `1px solid ${r.is_admin ? "rgba(200,134,10,0.25)" : "rgba(200,134,10,0.10)"}`,
+                        }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.3 }}>
+                            <Typography variant="caption" color="#7a5c3a">{formatDate(r.created_at)}</Typography>
+                            <Typography variant="caption" fontWeight={700}
+                              sx={{ color: r.is_admin ? "#c8860a" : "#5c3a1e" }}>
+                              {r.is_admin ? "מנהלת" : r.name}
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" color="#3b2008" sx={{ lineHeight: 1.8 }}>{r.comment}</Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              );
+            })
           }
         </Box>
       );
@@ -265,13 +361,44 @@ const UserProfile = ({ session, onNameChange }) => {
           <SectionTitle icon={<NotificationsNoneIcon />} label="התראות" />
           {notifications.length === 0
             ? <Typography variant="body2" color="#7a5c3a">אין התראות חדשות.</Typography>
-            : notifications.map((n, i) => (
-              <Box key={i} sx={{ py: 1.2, px: 2, mb: 1, borderRadius: 2,
-                bgcolor: "#fff8ee", border: "1px solid rgba(200,134,10,0.12)" }}>
-                <Typography variant="body2" color="#3b2008">{n.text}</Typography>
-                <Typography variant="caption" color="#7a5c3a">{formatDate(n.created_at)}</Typography>
-              </Box>
-            ))
+            : (
+              <>
+                {notifications.some((n) => !n.is_read) && (
+                  <Button size="small" onClick={markAllRead}
+                    sx={{ mb: 2, color: '#c8860a', p: 0, fontSize: 12,
+                      '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' } }}>
+                    סמן הכל כנקראו
+                  </Button>
+                )}
+                {notifications.map((n) => (
+                  <Box key={n.id}
+                    sx={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      py: 1.2, px: 0, mb: 1, borderRadius: 2,
+                      bgcolor: n.is_read ? '#fff8ee' : 'rgba(200,134,10,0.10)',
+                      border: `1px solid ${n.is_read ? 'rgba(200,134,10,0.12)' : 'rgba(200,134,10,0.35)'}`,
+                      overflow: 'hidden',
+                    }}>
+                    <Box sx={{ flex: 1, px: 1.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.3 }}>
+                        <Typography variant="caption" color="#7a5c3a">{formatDate(n.created_at)}</Typography>
+                        {!n.is_read && (
+                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#c8860a' }} />
+                        )}
+                      </Box>
+                      <Typography variant="body2" color="#3b2008">{n.title}</Typography>
+                    </Box>
+                    <Button size="small" onClick={(e) => { e.preventDefault(); dismissNotification(n.id); }}
+                      sx={{ flexShrink: 0, color: '#7a5c3a', fontSize: 11, px: 1.2, py: 0.4,
+                        border: '1px solid rgba(92,58,30,0.25)', borderRadius: 2,
+                        bgcolor: 'rgba(92,58,30,0.06)', mr: 1.5,
+                        '&:hover': { bgcolor: 'rgba(92,58,30,0.12)' } }}>
+                      הבנתי
+                    </Button>
+                  </Box>
+                ))}
+              </>
+            )
           }
         </Box>
       );
@@ -338,7 +465,21 @@ const UserProfile = ({ session, onNameChange }) => {
                   gap: 0.3,
                   "&:hover": { color: "#c8860a", bgcolor: "transparent" },
                 }}>
-                <Box sx={{ display: "flex" }}>{icon}</Box>
+                <Box sx={{ display: "flex", position: 'relative' }}>
+                  {icon}
+                  {id === 'notifications' && unreadCount > 0 && (
+                    <Box sx={{
+                      position: 'absolute', top: -6, left: -6,
+                      minWidth: 16, height: 16, borderRadius: '50%', px: '2px',
+                      bgcolor: '#707070', border: '1.5px solid rgba(255,250,245,0.97)',
+                      pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Typography sx={{ color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
                 {label}
               </Button>
             );

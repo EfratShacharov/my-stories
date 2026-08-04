@@ -25,7 +25,20 @@ const PROFILE_ITEMS = [
   { label: 'הגדרות',         tab: 'settings',       icon: <SettingsIcon fontSize="small" /> },
 ];
 
-const Navbar = ({ isAdmin, session, userName, userEmail, onAuthClick, onLogout }) => {
+const UnreadBadge = ({ count, bg = '#fffaf5' }) => count > 0 ? (
+  <Box sx={{
+    position: 'absolute', top: -6, left: -6,
+    minWidth: 16, height: 16, borderRadius: '50%', px: '2px',
+    bgcolor: '#707070', border: `1.5px solid ${bg}`,
+    pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  }}>
+    <Typography sx={{ color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>
+      {count > 9 ? '9+' : count}
+    </Typography>
+  </Box>
+) : null;
+
+const Navbar = ({ isAdmin, session, userName, userEmail, onAuthClick, onLogout, unreadCount = 0 }) => {
   const [drawerOpen, setDrawerOpen]     = useState(false);
   const [menuAnchor, setMenuAnchor]     = useState(null);
   const theme    = useTheme();
@@ -70,20 +83,24 @@ const Navbar = ({ isAdmin, session, userName, userEmail, onAuthClick, onLogout }
           {session ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               {!isMobile && (
-                <Button
-                  onClick={(e) => setMenuAnchor(e.currentTarget)}
-                  startIcon={<PersonIcon fontSize="small" />}
-                  size="small"
-                  sx={{
-                    color: '#c8860a', fontWeight: 600, fontSize: 13,
-                    border: '1px solid rgba(200,134,10,0.35)', borderRadius: 2,
-                    px: 1.5, py: 0.4,
-                    bgcolor: menuAnchor ? 'rgba(200,134,10,0.08)' : 'transparent',
-                    '&:hover': { bgcolor: 'rgba(200,134,10,0.08)' },
-                  }}
-                >
-                  שלום {userName}
-                </Button>
+                <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                  <Button
+                    onClick={(e) => setMenuAnchor(e.currentTarget)}
+                    endIcon={<PersonIcon fontSize="small" />}
+                    size="small"
+                    sx={{
+                      color: '#c8860a', fontWeight: 600, fontSize: 13,
+                      border: '1px solid rgba(200,134,10,0.35)', borderRadius: 2,
+                      px: 1.5, py: 0.4,
+                      '& .MuiButton-endIcon': { ml: 0, mr: 0.5 },
+                      bgcolor: menuAnchor ? 'rgba(200,134,10,0.08)' : 'transparent',
+                      '&:hover': { bgcolor: 'rgba(200,134,10,0.08)' },
+                    }}
+                  >
+                    שלום {userName}
+                  </Button>
+                  <UnreadBadge count={unreadCount} bg="rgba(245,237,227,0.92)" />
+                </Box>
               )}
             </Box>
           ) : (
@@ -196,7 +213,10 @@ const Navbar = ({ isAdmin, session, userName, userEmail, onAuthClick, onLogout }
                 bgcolor: active ? 'rgba(200,134,10,0.07)' : 'transparent',
                 '&:hover': { bgcolor: 'rgba(200,134,10,0.07)', color: '#c8860a' },
               }}>
-              <Box sx={{ color: active ? '#c8860a' : '#bfa07a', display: 'flex' }}>{icon}</Box>
+              <Box sx={{ color: active ? '#c8860a' : '#bfa07a', display: 'flex', position: 'relative' }}>
+                {icon}
+                {tab === 'notifications' && <UnreadBadge count={unreadCount} />}
+              </Box>
               <Typography variant="body2" fontWeight="inherit">{label}</Typography>
             </MenuItem>
           );

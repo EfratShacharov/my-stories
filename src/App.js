@@ -67,6 +67,17 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [showUser, setShowUser] = useState(false);
   const [userEmail, setUserEmail] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const loadUnreadCount = async (userId) => {
+    if (!userId) { setUnreadCount(0); return; }
+    const { count } = await supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_read", false);
+    setUnreadCount(count || 0);
+  };
 
   const loadUserData = async (userId) => {
     if (!userId) {
@@ -84,6 +95,7 @@ function App() {
     setUserName(data?.name || "");
     setIsAdmin(data?.is_admin === true);
     setUserEmail(userId ? (await supabase.auth.getUser()).data?.user?.email || "" : "");
+    await loadUnreadCount(userId);
   };
 
   useEffect(() => {
@@ -104,12 +116,38 @@ function App() {
           setUserName("");
           setIsAdmin(false);
           setShowUser(false);
+          setUnreadCount(0);
         }
       }
     );
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const channel = supabase
+      .channel('notifications-count')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'notifications',
+        filter: `user_id=eq.${session.user.id}`,
+      }, (payload) => {
+        if (!payload.new.is_read) setUnreadCount((c) => c + 1);
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'notifications',
+        filter: `user_id=eq.${session.user.id}`,
+      }, (payload) => {
+        if (payload.new.is_read && !payload.old.is_read) setUnreadCount((c) => Math.max(0, c - 1));
+      })
+      .on('postgres_changes', {
+        event: 'DELETE', schema: 'public', table: 'notifications',
+      }, (payload) => {
+        if (!payload.old.is_read) setUnreadCount((c) => Math.max(0, c - 1));
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [session?.user?.id]);
 
   if (loading) return null;
 
@@ -124,6 +162,7 @@ function App() {
               session={showUser ? session : null}
               userName={userName}
               userEmail={userEmail}
+              unreadCount={unreadCount}
               onAuthClick={() => setAuthOpen(true)}
               onLogout={async () => {
                 await supabase.auth.signOut();
@@ -131,6 +170,7 @@ function App() {
                 setSession(null);
                 setUserName("");
                 setShowUser(false);
+                setUnreadCount(0);
               }}
             />
 
@@ -168,8 +208,8 @@ function App() {
                 <Route path="/about" element={<About />} />
                 <Route path="/behind/:id" element={<BehindTheScenes />} />
                 <Route path="/manage-behind" element={isAdmin ? <BehindManager /> : <Home />} />
-                <Route path="/profile/:tab" element={session ? <UserProfile session={session} onNameChange={(n) => setUserName(n)} /> : <Home />} />
-                <Route path="/profile" element={session ? <UserProfile session={session} onNameChange={(n) => setUserName(n)} /> : <Home />} />
+                <Route path="/profile/:tab" element={session ? <UserProfile session={session} onNameChange={(n) => setUserName(n)} onMarkRead={() => setUnreadCount(0)} /> : <Home />} />
+                <Route path="/profile" element={session ? <UserProfile session={session} onNameChange={(n) => setUserName(n)} onMarkRead={() => setUnreadCount(0)} /> : <Home />} />
               </Routes>
             </div>
 

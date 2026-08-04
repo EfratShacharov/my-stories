@@ -180,6 +180,7 @@ App.js
 
 - **session / isAdmin / userName / userEmail** – מנוהל ב-`App.js`, מועבר כ-props ל-Navbar ולקומפוננטים
 - **userEmail** – נשלף דרך `supabase.auth.getUser()` בתוך `loadUserData`, מועבר ל-Navbar להצגה ב-dropdown
+- **unreadCount** – מנוהל ב-`App.js`, מועבר ל-Navbar; מתעדכן מיידית דרך Realtime (INSERT +1, UPDATE read -1, DELETE -1) ללא query ל-DB; מתאפס ל-0 ב-logout ובכניסה לטאב ההתראות
 - **comments** – מנוהל ב-`CommentsContext`:
   - נטען פעם אחת עם `fetchComments` ב-useEffect
   - מתעדכן אוטומטית דרך **Supabase Realtime** על כל שינוי בטבלת `comments`
@@ -199,7 +200,7 @@ App.js
 ## Navbar
 
 ### Props
-`isAdmin, session, userName, userEmail, onAuthClick, onLogout`
+`isAdmin, session, userName, userEmail, onAuthClick, onLogout, unreadCount`
 
 ### Desktop
 - שם המשתמש מוצג כ-Button בצד שמאל של ה-Toolbar
@@ -208,6 +209,11 @@ App.js
   - 5 פריטי ניווט לפרופיל (`PROFILE_ITEMS`)
   - Divider + כפתור התנתקות בתחתית
 - אין כפתור logout נפרד ב-Toolbar
+- **`UnreadBadge`** — component פנימי שמציג עיגול אפור `#707070` עם מספר ההתראות הלא-נקראות (עד 9, מעל זה `9+`) ב-3 מקומות:
+  - על כפתור הפרופיל
+  - על אייקון ההתראות בתפריט הדרופדאון
+  - על כפתור טאב ההתראות ב-UserProfile
+- הנקודה נעלמת כשנכנסים לטאב ההתראות (כל ההתראות מסומנות כנקראו)
 
 ### Mobile (Drawer)
 - פריטי ניווט רגילים + Divider + שם המשתמש + 5 פריטי פרופיל בתוך ה-Drawer
@@ -229,7 +235,7 @@ App.js
 ## עמוד UserProfile (`/profile/:tab`)
 
 ### Props
-`session, onNameChange`
+`session, onNameChange, onMarkRead`
 
 ### מבנה
 - דף מלא עם רקע `#f5ede3`
@@ -243,7 +249,7 @@ App.js
 | `account` | פרטים אישיים | עדכון שם / מייל / סיסמה |
 | `likes` | סיפורים שאהבתי | רשימת סיפורים שאהב המשתמש עם קישור לקריאה |
 | `comments` | התגובות שלי | תגובות ראשיות של המשתמש עם קישור לסיפור |
-| `notifications` | התראות | רשימת התראות (ריקה כרגע) |
+| `notifications` | התראות | רשימת התראות עם כפתור "הבנתי" למחיקה ו"סמן הכל כנקראו" |
 | `settings` | הגדרות | toggle לעדכוני מייל |
 
 ### הודעות — קומפוננט `Msg`
@@ -259,8 +265,14 @@ App.js
 - `users`: `select name, email, email_updates`
 - `story_likes`: `select stories(id,title)` לפי `user_identifier`
 - `comments`: `select id,comment,story_title,created_at,status,story_id` לפי `name` + `is_admin=false` + `parent_id=null`
+- `comments` (replies): `select id,comment,name,created_at,status,is_admin,parent_id` לפי `parent_id in [rootIds]` — תגובות מנהל תמיד מוצגות, תגובות משתמש רק אם `approved`
+- `notifications`: `select id,type,title,link,is_read,created_at` לפי `user_id` — טעינה + Realtime INSERT/UPDATE/DELETE
 - `supabase.auth.updateUser({ email })` — עדכון מייל (שולח מייל אימות)
 - `supabase.auth.updateUser({ password })` — עדכון סיסמה
+
+### Realtime ב-UserProfile
+- subscription על `notifications` לפי `user_id` — מעדכן את רשימת ההתראות מיידית
+- כניסה לטאב `notifications` — מסמן אוטומטית את כל ההתראות כנקראו ומפעיל `onMarkRead`
 
 ---
 
@@ -440,6 +452,50 @@ ALTER TABLE behind_the_scenes ENABLE ROW LEVEL SECURITY;
 - דיאלוג הוספה/עריכה: שדה כותרת + העלאת DOCX + העלאת PDF
 - Realtime subscription על טבלת `stories` — רשימת הסיפורים מתעדכנת אוטומטית בכל שינוי
 - **חשוב:** יש להפעיל Realtime על טבלת `stories` ב-Supabase Dashboard תחת **Database → Replication**
+
+---
+
+## מערכת התראות
+
+### טבלת `notifications`
+
+**מבנה:**
+```js
+{ id, user_id, type, title, link, is_read, created_at }
+```
+
+**RLS Policies:**
+```sql
+CREATE POLICY "user can read own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "user can update own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "user can delete own notifications" ON notifications FOR DELETE USING (auth.uid() = user_id);
+-- INSERT רק דרך service_role (triggers)
+```
+
+**DB Triggers (SQL):**
+- `notify_new_story` — שולח התראה לכל המשתמשים בעת פרסום סיפור חדש
+- `notify_comment_pending` — שולח התראה למנהל כשתגובה חדשה ממתינה לאישור
+- `notify_comment_approved` — שולח התראה למשתמש כשתגובתו אושרה
+- `notify_reply` — שולח התראה למשתמש כשמשיבים לתגובתו
+
+### זרימת נתונים
+
+```
+DB Trigger → INSERT to notifications
+    ↓
+App.js Realtime (INSERT) → unreadCount + 1
+UserProfile Realtime (INSERT) → notifications list מתעדכן
+    ↓
+UnreadBadge מוצג ב-3 מקומות
+    ↓
+כניסה לטאב notifications → markAllRead() → unreadCount = 0 → badge נעלם
+```
+
+### Realtime ב-App.js
+- subscription על `notifications` לפי `user_id`
+- INSERT → `unreadCount + 1` (ישירות, ללא query)
+- UPDATE (is_read: false→true) → `unreadCount - 1`
+- DELETE (לא נקראה) → `unreadCount - 1`
 
 ---
 
